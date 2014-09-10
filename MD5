@@ -1,0 +1,12 @@
+53121ec389d8885318499775f72940ab *CHANGELOG
+79886f9739ce14a24a209b4e12b3b904 *DESCRIPTION
+184bdb6aa1e5bc91fe04a3796846de39 *NAMESPACE
+aaa2807134790f3ce5d785c0b0497d79 *R/RDML.R
+c936ea13111108d3265cc5bac84c63d8 *R/summary.RDML.R
+3b5614ba89f57e4be5ea9456dd21e203 *README.md
+89e2eb6e321bf8ed489904ad8971d252 *inst/RDML_logo.png
+41080f65be7590b9bac0f0e1abcd10c2 *inst/extdata/BioRad_qPCR_melt.rdml
+f539a607cec87fa06753bba19c20ce0e *inst/extdata/lc96_bACTXY.rdml
+72c3e49105bfa8eb4a705a16831f5cdb *inst/extdata/stepone_std.rdml
+e225a3a563ac77b1e9cead0875263b8e *man/RDML.Rd
+da857ee9ca9fc1140e185cd9dcc078ab *man/summary-RDML_object.Rd

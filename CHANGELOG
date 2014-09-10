@@ -1,0 +1,20 @@
+Changes from Version 0.4-1 to 0.4-2 [September 10 2014] 
+* Added "Not run" to documentation
+
+Changes from Version 0.4 to 0.4-1 [September 09 2014] 
+* Improved documentation
+* Improved some examples
+* Minor code improvements
+* Submission to CRAN
+* New summary object summary-RDML_object
+
+Initial release version 0.4 [September 5 2014] 
+* Initial public release of RDML package by Konstantin A. Blagodatskikh at github
+  - Contributions by Stefan Roediger
+  - Renamed from import.RDML to RDML
+  - Latest source code hosted at https://github.com/kablag/RDML now
+* New examples
+* Code cleanup
+* Initial version of logo
+* Suggests qpcR and chipPCR package
+* Improved documentation

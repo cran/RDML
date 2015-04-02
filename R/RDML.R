@@ -1,354 +1,672 @@
-# Unzips RDML to get inner XML content
-getRDMLdoc <- function(file)
-{
-  unzippedRDML <- unzip(file)
-  if (length(unzippedRDML) > 1)
-  {
-    rdmldoc <- xmlParse("rdml_data.xml")
-  }
-  else
-  {
-    rdmldoc <- xmlParse(unzippedRDML)
-  }
-  unlink(unzippedRDML)
-  return(rdmldoc)
-}
-
-# Gets file publisher (instrumant manufacturer)
-getPublisher <- function(RDMLdoc)
-{
-  publisher <- xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:id/rdml:publisher",
-    xmlValue,
-    namespaces = c(rdml = "http://www.rdml.org"))  
-  if (length(publisher) != 0){ return(publisher) }
-  else { return("StepOne") }
-}
-
-# Gets PCR targets vector from XML
-getTargets <- function(RDMLdoc)
-{
-  xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:target[@id]",
-    xmlGetAttr, 
-    name = "id",
-    namespaces = c(rdml = "http://www.rdml.org"))
-}
-
-# Gets PCR samples descriptions vector from XML
-getDescriptions <- function(RDMLdoc)
-{
-  samplesids <- xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:sample",
-    xmlGetAttr,
-    name = "id",
-    namespaces = c(rdml = "http://www.rdml.org"))
-  descriptions <- xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:sample/rdml:description",
-    xmlValue,
-    namespaces = c(rdml = "http://www.rdml.org"))  
-  names(descriptions) <- samplesids
-  return(descriptions)
-}
-
-# Gets PCR targets vector from XML
-getRuns <- function(RDMLdoc)
-{
-  xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:experiment/rdml:run",
-    xmlGetAttr, 
-    name = "id",
-    namespaces = c(rdml = "http://www.rdml.org"))
-}
-
-# Gets plate dimensions from XML
-getPlateDimensions <- function(RDMLdoc)
-{
-  
-  rows <- tryCatch({as.integer(xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:experiment/rdml:run/rdml:pcrFormat/rdml:rows",
-    xmlValue,
-    namespaces = c(rdml = "http://www.rdml.org"))[1])},
-    error = function(e) 8)
-  columns <- tryCatch({as.integer(xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:experiment/rdml:run/rdml:pcrFormat/rdml:columns",
-    xmlValue,
-    namespaces = c(rdml = "http://www.rdml.org"))[1])},
-    error = function(e) 12)
-  return(c(rows = rows, columns = columns))
-}
-
-# Gets type (Unknown, Positive, Standart, etc.)
-# of each sample from XML
-getTypes <- function(RDMLdoc)
-{    
-  samplesids <- xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:sample",
-    xmlGetAttr,
-    name = "id",
-    namespaces = c(rdml = "http://www.rdml.org"))
-  types <- xpathSApply(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:sample/rdml:type",
-    xmlValue,
-    namespaces = c(rdml = "http://www.rdml.org"))  
-  names(types) <- samplesids
-  return(types)
-}
-
-# Gets concentrations (quantity) of each 
-# dilution from XML
-getDilutions <- function(RDMLdoc)
-{
-  # XML nodes that contain "quantity" information
-  nodes <- getNodeSet(
-    RDMLdoc, 
-    "/rdml:rdml/rdml:sample/rdml:quantity/rdml:value/../..",    
-    namespaces = c(rdml = "http://www.rdml.org"))
-  values <- sapply(nodes, function(node) {
-    as.numeric(xmlValue(node[["quantity"]][["value"]]))})
-  # names of the samples that contain "quantity" information
-  samplesids <- sapply(nodes, xmlGetAttr, name = "id")
-  names(values) <- samplesids
-  # sorting quantities by sample name
-  values <- values[order(names(values))]
-  return(values)  
-}  
-
-
-# Get dilutions Roche
-getDilutionsRoche <- function(filename)
-{
-  unzippedRDML <- unzip(filename)
-  rdmldoc <- xmlParse("calculated_data.xml")
-  unlink(unzippedRDML) 
-  
-  nodes<- getNodeSet(
-    rdmldoc, 
-    "//ns:absQuantDataSource/ns:standard/..",    
-    namespaces = c(ns = "http://www.roche.ch/LC96AbsQuantCalculatedDataModel"))
-  
-  dilutions <- list()
-  for(node in nodes){
-    quant <- xmlValue(node[["standard"]])
-    position <- xpathSApply(
-      rdmldoc, 
-      paste0("//ns:standardPoints/ns:standardPoint/ns:graphIds/ns:guid[text() ='",
-            xmlValue(node[["graphId"]]), "']/../../ns:position"), xmlValue,
-      namespaces = c(ns = "http://www.roche.ch/LC96AbsQuantCalculatedDataModel"))
-    dye <- xpathSApply(
-      rdmldoc, 
-      paste0("//ns:standardPoints/ns:standardPoint/ns:graphIds/ns:guid[text() ='",
-            xmlValue(node[["graphId"]]), "']/../../ns:dyeName"), xmlValue,
-      namespaces = c(ns = "http://www.roche.ch/LC96AbsQuantCalculatedDataModel"))
-    dilutions[[dye]] <- cbind(dilutions[[dye]],c(position, quant))
-  }
-  dilutions <- lapply(dilutions, function(dilution){
-    quant <- as.numeric(dilution[2, ])
-    quant <- t(as.data.frame(quant))
-    colnames(quant) <- dilution[1, ]
-    return(quant) })
-  return(dilutions)
-}
-
-# Generates sample name by specified pattern
-generateSampleName <- function (name.pattern,
-                                plateDims,
-                                reactID,
-                                tubeName,
-                                target,
-                                type,
-                                publisher)
-{   
-  tube <- ifelse((publisher == "Roche Diagnostics" || 
-                 publisher == "StepOne"),
-                 reactID,
-                 { reactID <- as.integer(reactID)
-                 paste0(LETTERS[reactID %/% plateDims["columns"] + 1],
-			reactID %% plateDims["columns"])})  
-  name.pattern <- gsub("%NAME%",
-                       tubeName,
-                       name.pattern)
-  name.pattern <- gsub("%ID%",
-                       reactID,
-                       name.pattern)
-  name.pattern <- gsub("%TUBE%",
-                       tube,
-                       name.pattern)
-  name.pattern <- gsub("%TARGET%",
-                       target,
-                       name.pattern)
-  name.pattern <- gsub("%TYPE%",
-                       type,
-                       name.pattern)
-  return(name.pattern)
-}
-
-# Main function
-RDML <- function(rdmlfile = NA,
-                           name.pattern = "%NAME%__%TUBE%",
-                           flat.table = FALSE,
-                           omit.ntp = TRUE)
-{ 
-  rdmldoc <- getRDMLdoc(rdmlfile)
-  publisher <- getPublisher(rdmldoc)
-#   dilutions <- ifelse(publisher == "Roche Diagnostics",
-#                       getDilutionsRoche(rdmlfile),
-#                       getDilutions(rdmldoc))
-  if (publisher == "Roche Diagnostics") {
-    dilutions <- getDilutionsRoche(rdmlfile)
-  }
-  else {
-    dilutions <- getDilutions(rdmldoc)
-  }
-    
-  types <- getTypes(rdmldoc)
-  targets <- getTargets(rdmldoc)
-  plateDims <- getPlateDimensions(rdmldoc)  
-  if (publisher == "Roche Diagnostics") sdescs <- getDescriptions(rdmldoc)
-  
-  nodes <- getNodeSet(
-    rdmldoc,
-    "//rdml:react",
-    namespaces = c(rdml = "http://www.rdml.org"))
-  #   Adps<-ifelse(flat.table == TRUE,
-  #                yes = array(),
-  #                no = list())
-  
-  if (flat.table) Adps <- array()
-  else Adps <- list()
-  if (flat.table) Mdps <- array()
-  else Mdps <- list()
-  
-  for(node in nodes) {
-    
-    reactID <- xmlGetAttr(node, name = "id")
-    sampleID <- xmlGetAttr(node[["sample"]], name = "id")
-    tubeName <- ifelse(publisher == "Roche Diagnostics",
-                       sdescs[sampleID],
-                       sampleID)    
-    type <- types[sampleID]
-    # omit empty Bio-Rad data
-    try(
-      # omit Roche cleared wells 'ntp' type
-    if (!(type == "ntp" && omit.ntp)) {
-      for(fdata in node["data", all = TRUE])
-      {
-        targetID <- xmlGetAttr(fdata[["tar"]], name = "id")
-        if (targetID == "") targetID <- "NA"
-        sampleName <- generateSampleName(name.pattern,
-                                         plateDims,
-                                         reactID,
-                                         tubeName,
-                                         targetID,
-                                         type,
-                                         publisher)
-        
-        adps <- sapply(fdata["adp", all = TRUE],
-                       function(x) as.numeric(xmlValue(x[["fluor"]])))
-        mdps <- sapply(fdata["mdp", all = TRUE],
-                       function(x) as.numeric(xmlValue(x[["fluor"]])))
-        # flat.table == TRUE
-        if (flat.table) {
-          # add qPCR data
-          if (length(adps) != 0) {
-            Adps <- cbind(
-              Adps, adps)          
-            colnames(Adps) <- 
-              c(colnames(Adps)[-length(colnames(Adps))],sampleName)
-            # works only after first column added
-            if (typeof(Adps) == "double")
-            {
-              Cycles <- sapply(fdata["adp", all = TRUE],
-                               function(x) xmlValue(x[["cyc"]]))
-              Adps <- as.data.frame(Adps,
-                                    row.names = Cycles)
-              Cycles <- as.numeric(Cycles)
-              Adps <- cbind(Cycles, Adps)
-              Adps <- Adps[-2]
-            }
-          }
-          # add melting data
-          if (length(mdps) != 0) {
-            Mdps <- cbind(
-              Mdps , mdps)
-            colnames(Mdps) <- 
-              c(colnames(Mdps)[-length(colnames(Mdps))],
-                sampleName)
-            # works only after first column added
-            if (typeof(Mdps) == "double")
-            {              
-              Tmps <- sapply(fdata["mdp", all = TRUE],
-                             function(x) xmlValue(x[["tmp"]]))
-              Mdps <- 
-                as.data.frame(Mdps,
-                              row.names = Tmps)
-              Tmps <- as.numeric(Tmps)
-              Mdps <- cbind(Tmps, Mdps)
-              Mdps <- Mdps[-2]
-            }
-          }
-        }
-        # flat.table == FALSE
-        else {
-          # add qPCR data
-          if (length(adps) != 0) {
-            Adps[[targetID]][[type]] <- cbind(
-              Adps[[targetID]][[type]], adps)          
-            colnames(Adps[[targetID]][[type]]) <- 
-              c(colnames(Adps[[targetID]][[type]])[-length(colnames(Adps[[targetID]][[type]]))],
-                sampleName)
-            # works only after first column added
-            if (typeof(Adps[[targetID]][[type]]) == "double")
-            {
-              Cycles <- sapply(fdata["adp", all = TRUE],
-                               function(x) xmlValue(x[["cyc"]]))
-              Adps[[targetID]][[type]] <- 
-                as.data.frame(Adps[[targetID]][[type]],
-                              row.names = Cycles)
-              Cycles <- as.numeric(Cycles)
-              Adps[[targetID]][[type]] <- cbind(Cycles, Adps[[targetID]][[type]])
-            }
-          }
-          # add melting data
-          if (length(mdps) != 0) {
-            Mdps[[targetID]][[type]] <- cbind(
-              Mdps[[targetID]][[type]], mdps)
-            colnames(Mdps[[targetID]][[type]]) <- 
-              c(colnames(Mdps[[targetID]][[type]])[-length(colnames(Mdps[[targetID]][[type]]))],
-                sampleName)
-            # works only after first column added
-            if (typeof(Mdps[[targetID]][[type]]) == "double")
-            {
-              Tmps <- sapply(fdata["mdp", all = TRUE],
-                             function(x) xmlValue(x[["tmp"]]))
-              Mdps[[targetID]][[type]] <- 
-                as.data.frame(Mdps[[targetID]][[type]],
-                              row.names = Tmps)
-              Tmps <- as.numeric(Tmps)
-              Mdps[[targetID]][[type]] <- cbind(Tmps, Mdps[[targetID]][[type]])
-            }
-          }
-        }
-      }
-    }
-    , silent = TRUE)
-  }
-  output <- list(
-    Dilutions = dilutions,
-    qPCR = Adps,
-    Melt = Mdps)
-  # remove empty elements (Dilutions, Adps or Mdps)
-  output[sapply(output, function(x) length(x) == 0)] <- NULL
-  class(output) <- "RDML_object"
-  output
-}
-
+#' R6 class \code{RDML} -- contains methods to read and overview fluorescence 
+#' data from RDML v1.1 and v1.2 format files
+#' 
+#' Main purpose of this class is to work with RDML format data (Lefever et al. 
+#' 2009) and transform it to the appropriate format of the \code{qpcR} (Ritz et 
+#' al. 2008, Spiess et al. 2008) and \code{chipPCR} packages (see 
+#' \link{RDML.new} for import details). 
+#' Real-time PCR Data Markup Language (RDML) is the recommended file format 
+#' element in the Minimum Information for Publication of Quantitative Real-Time 
+#' PCR Experiments (MIQE) guidelines (Bustin et al. 2009). Inner structure of 
+#' imported data mimics structure of RDML file v1.2. All data except fluorescence values
+#' can be represented as \code{data.frame} by method \code{AsTable}. Such variant of data representation allows easy samples 
+#' filtering (by targets, types, etc.) and serves as request for \code{GetFData}
+#' method -- gets fluorescence data for specified samples.
+#' 
+#' 
+#' @section Fields: Type, structure of data and description of fields can be 
+#'   viewed at RDML v1.2 file description. Names of fields are first level of 
+#'   XML tree.
+#' @section Methods: \describe{\item{new}{creates new instance of \code{RDML} 
+#'   class object (see \link{RDML.new})} \item{AsTable}{represent RDML data as 
+#'   \code{data.frame} (see \link{RDML.AsTable})}\item{GetFData}{gets
+#'   fluorescence data (see \link{RDML.GetFData})}\item{SetFData}{sets
+#'   fluorescence data (see \link{RDML.SetFData})}\item{Merge}{merges two 
+#'   \code{RDML} to one (see \link{RDML.Merge})}
+#'   \item{AsDendrogram}{represents structure of \code{RDML} object as dendrogram(see \link{RDML.AsDendrogram})}}
+#'   
+#' @author Konstantin A. Blagodatskikh <k.blag@@yandex.ru>, Stefan Roediger 
+#'   <stefan.roediger@@hs-lausitz.de>, Michal Burdukiewicz 
+#'   <michalburdukiewicz@@gmail.com>
+#' @references RDML format http://www.rdml.org/ \code{R6} package 
+#'   http://cran.r-project.org/web/packages/R6/index.html
+#'   
+#'   \code{qpcR} package http://cran.r-project.org/web/packages/qpcR/index.html
+#'   
+#'   \code{chipPCR} package: 
+#'   http://cran.r-project.org/web/packages/chipPCR/index.html
+#'   
+#'   Ritz, C., Spiess, A.-N., 2008. qpcR: an R package for sigmoidal model 
+#'   selection in quantitative real-time polymerase chain reaction analysis. 
+#'   \emph{Bioinformatics} 24, 1549--1551. doi:10.1093/bioinformatics/btn227
+#'   
+#'   Spiess, A.-N., Feig, C., Ritz, C., 2008. Highly accurate sigmoidal fitting 
+#'   of real-time PCR data by introducing a parameter for asymmetry. \emph{BMC 
+#'   Bioinformatics} 9, 221. doi:10.1186/1471-2105-9-221
+#'   
+#'   Bustin, S.A., Benes, V., Garson, J.A., Hellemans, J., Huggett, J., Kubista,
+#'   M., Mueller, R., Nolan, T., Pfaffl, M.W., Shipley, G.L., Vandesompele, J., 
+#'   Wittwer, C.T., 2009. The MIQE guidelines: minimum information for 
+#'   publication of quantitative real-time PCR experiments. \emph{Clin. Chem.} 
+#'   55, 611--622.  doi:10.1373/clinchem.2008.112797
+#'   
+#'   Lefever, S., Hellemans, J., Pattyn, F., Przybylski, D.R., Taylor, C., 
+#'   Geurts, R., Untergasser, A., Vandesompele, J., RDML consortium, 2009. RDML:
+#'   structured language and reporting guidelines for real-time quantitative PCR
+#'   data.  \emph{Nucleic Acids Res.} 37, 2065--2069. doi:10.1093/nar/gkp056
+#' @keywords Bio--Rad CFX96 file IO LightCycler qPCR RDML StepOne
+#' @name RDML.class
+#' @aliases RDML.class RDML
+#' @docType class
+#' @export
+#' @import assertthat 
+#' @importFrom R6 R6Class
+#' @importFrom plyr llply ldply ddply compact
+#' @import dplyr
+#' @include RDML.asserts.R
+#' @examples 
+#' ## EXAMPLE 1:
+#' ## internal dataset lc96_bACTXY.rdml (in 'data' directory)
+#' ## generated by Roche LightCycler 96. Contains qPCR data
+#' ## with four targets and two types.
+#' ## Import with default settings.
+#' PATH <- path.package("RDML")
+#' filename <- paste(PATH, "/extdata/", "lc96_bACTXY.rdml", sep ="")
+#' lc96 <- RDML$new(filename)
+#' 
+#' tab <- lc96$AsTable(name.pattern = paste(sample[[react$sample]]$description,
+#'                                          react$id), 
+#'                     quantity = sample[[react$sample]]$quantity$value)
+#' ## Show dyes names
+#' unique(tab$target.dyeId)
+#' ## Show types of the samples for dye 'FAM'
+#' library(dplyr)
+#' unique(filter(tab, target.dyeId == "FAM")$sample.type)
+#' 
+#' ## Show template quantities for dye 'FAM' type 'std'#' 
+#' \dontrun{
+#' COPIES <- filter(tab, target.dyeId == "FAM", sample.type == "std")$quantity
+#' ## Define calibration curves (type of the samples - 'std').
+#' ## No replicates.
+#' library(qpcR)
+#' CAL <- modlist(lc96$GetFData(filter(tab,
+#'                                     target.dyeId == "FAM", 
+#'                                     sample.type == "std")),
+#'                baseline="lin", basecyc=8:15)
+#' ## Define samples to predict (first two samples with the type - 'unkn').
+#' PRED <- modlist(lc96$GetFData(filter(tab, 
+#'                                     target.dyeId == "FAM", 
+#'                                     sample.type == "unkn")),
+#'                baseline="lin", basecyc=8:15)
+#' ## Conduct quantification.
+#' calib(refcurve = CAL, predcurve = PRED, thresh = "cpD2",
+#'       dil = COPIES)
+#' }
+#' \dontrun{
+#' ## EXAMPLE 2:
+#' ## internal dataset lc96_bACTXY.rdml (in 'data' directory)
+#' ## generated by Roche LightCycler 96. Contains qPCR data
+#' ## with four targets and two types.
+#' ## Import with default settings.
+#' library(chipPCR)                        
+#' PATH <- path.package("RDML")
+#' filename <- paste(PATH, "/extdata/", "lc96_bACTXY.rdml", sep ="")
+#' lc96 <- RDML$new(filename)
+#' 
+#' tab <- lc96$AsTable(name.pattern = paste(sample[[react$sample]]$description,
+#'                                          react$id), 
+#'                     quantity = sample[[react$sample]]$quantity$value)
+#' ## Show targets names
+#' unique(tab$target)
+#' ## Fetch cycle dependent fluorescence for HEX chanel
+#' tmp <- lc96$GetFData(filter(tab, target == "FAM@@bACT", sample.type == "std"))
+#' ## Fetch vector of dillutions 
+#' dilution <- filter(tab, target.dyeId == "FAM", sample.type == "std")$quantity
+#' 
+#' ## Use plotCurves function from the chipPCR package to 
+#' ## get an overview of the amplification curves
+#' plotCurves(tmp[,1], tmp[,-1])
+#' par(mfrow = c(1,1))
+#' ## Use inder function from the chipPCR package to 
+#' ## calculate the Cq (second derivative maximum, SDM)
+#' SDMout <- sapply(2L:ncol(tmp), function(i) {
+#'   SDM <- summary(inder(tmp[, 1], tmp[, i]), print = FALSE)[2]
+#' })
+#' 
+#' ## Use the effcalc function from the chipPCR package and 
+#' ## plot the results for the calculation of the amplification
+#' ## efficiency analysis.
+#' plot(effcalc(dilution, SDMout), CI = TRUE)
+#' }
+#' \dontrun{
+#' ## EXAMPLE 3:
+#' ## internal dataset BioRad_qPCR_melt.rdml (in 'data' directory)
+#' ## generated by Bio-Rad CFX96. Contains qPCR and melting data.
+#' ## Import with custom name pattern.
+#' PATH <- path.package("RDML")
+#' filename <- paste(PATH, "/extdata/", "BioRad_qPCR_melt.rdml", sep ="")
+#' cfx96 <- RDML$new(filename)
+#' ## Use plotCurves function from the chipPCR package to 
+#' ## get an overview of the amplification curves
+#' library(chipPCR)
+#' ## Extract all qPCR data 
+#' tab <- cfx96$AsTable()
+#' cfx96.qPCR <- cfx96$GetFData(tab)
+#' plotCurves(cfx96.qPCR[,1], cfx96.qPCR[,-1], type = "l")
+#' 
+#' ## Extract all melting data 
+#' cfx96.melt <- cfx96$GetFData(tab, data.type = "mdp")
+#' ## Show some generated names for samples.
+#' colnames(cfx96.melt)[2L:5]
+#' ## Select columns that contain
+#' ## samples with dye 'EvaGreen' and have type 'pos'
+#' ## using filtering by names.
+#' cols <- cfx96$GetFData(filter(tab, grepl("pos_EvaGreen$", fdata.name)),
+#'                        data.type = "mdp")
+#' ## Conduct melting curve analysis.
+#' library(qpcR)
+#' invisible(meltcurve(cols, fluos = 2:ncol(cols),
+#'           temps = rep(1, ncol(cols) - 1)))
+#' }
+RDML <- R6Class("RDML",
+                public = list(
+                  ###               WARNING
+                  ### All RDML functions are store at separate files!!!
+                  ### Empty functions are added to let roxygen work.                  
+                  initialize = function() { },                  
+                  AsTable = function() { },
+                  GetFData = function() { },
+                  SetFData = function() { },
+                  Merge = function() { },
+                  AsDendrogram = function() { }
+                ),
+                private = list(
+                  .dilutions = NULL,
+                  .conditions = NULL,
+                  .dateMade = NULL,
+                  .dateUpdated = NULL,                  
+                  .id = NULL,
+                  .experimenter = NULL,
+                  .documentation = NULL,
+                  .dye = NULL,
+                  .sample = NULL,
+                  .target = NULL,
+                  .thermalCyclingConditions = NULL,
+                  .experiment = NULL,
+                  .recalcPositions = function() {
+                    for(exp.id in names(private$.experiment)) {
+                      for(run.id in names(
+                        private$.experiment[[exp.id]]$run)) {
+                        for(react.id in names(
+                          private$.experiment[[exp.id]]$
+                          run[[run.id]]$react)) {
+                          private$.experiment[[exp.id]]$
+                            run[[run.id]]$
+                            react[[react.id]]$position <- {
+                              id <- as.integer(react.id)
+                              cols <- private$.experiment[[exp.id]]$
+                                run[[run.id]]$pcrFormat$columns
+                              sprintf("%s%02i",
+                                      LETTERS[(id - 1) %/% cols + 1],
+                                      as.integer((id - 1) %% cols + 1))
+                            }
+                        }
+                      }
+                    }
+                  }
+                ),
+                active = list(
+                  dateMade = function(date.made) {
+                    if(missing(date.made))
+                      return(private$.dateMade)
+                    assert_that(is.string(date.made))
+                    private$.dateMade <- date.made
+                  },
+                  
+                  dateUpdated = function(date.updated) {
+                    if(missing(date.updated))
+                      return(private$.date.updated)
+                    assert_that(is.string(date.updated))
+                    private$.dateUpdated <- date.updated
+                  },
+                  
+                  id = function(new.ids) {
+                    if(missing(new.ids))
+                      return(private$.id)                    
+                    assert_that(is.list(new.ids))                                  
+                    for(id in new.ids) {
+                      assert_that(is.list(id))
+                      assert_that(
+                        has.only.names(id,
+                                       c("id",
+                                         "publisher",
+                                         "serialNumber",
+                                         "MD5Hash")))
+                      assert_that(is.string(id$publisher))
+                      assert_that(is.string(id$serialNumber))
+                      assert_that(is.opt.string(id$MD5Hash))
+                    }
+                    private$.id <- new.ids
+                  },
+                  
+                  experimenter = function(new.experimenters) {
+                    if(missing(new.experimenters))
+                      return(private$.experimenter)
+                    
+                    experimenter.fields <- c("id",
+                                             "firstName",
+                                             "lastName",
+                                             "email",
+                                             "labName",
+                                             "labAddress")
+                    assert_that(is.list(new.experimenters))
+                    for(experimenter in new.experimenters) {
+                      assert_that(is.list(experimenter))
+                      assert_that(has.only.names(experimenter,
+                                                 experimenter.fields))
+                      assert_that(is.string(experimenter$id))
+                      assert_that(is.string(experimenter$firstName))
+                      assert_that(is.string(experimenter$lastName))
+                      assert_that(is.opt.string(experimenter$email))
+                      assert_that(is.opt.string(experimenter$labName))
+                      assert_that(is.opt.string(experimenter$labAddress))                      
+                    }
+                    names(new.experimenters) <- GetIds(new.experimenters)
+                    private$.experimenter <- new.experimenters
+                  },
+                  
+                  documentation = function(new.docs) {
+                    if(missing(new.docs))
+                      return(private$.documentation)
+                    assert_that(is.list(new.docs))                    
+                    for(doc in new.docs) {
+                      assert_that(is.list(doc))
+                      assert_that(has.only.names(doc,
+                                                 c("id",
+                                                   "text")))
+                      assert_that(is.string(doc$id))
+                      assert_that(is.string(doc$text))
+                    }
+                    names(new.docs) <- GetIds(new.docs)
+                    private$.documentation <- new.docs
+                  },
+                  
+                  dye = function(new.dyes) {
+                    if(missing(new.dyes))
+                      return(private$.dye)
+                    assert_that(is.list(new.dyes))
+                    for(dye in new.dyes) {
+                      assert_that(is.list(dye))
+                      assert_that(has.only.names(dye,
+                                                 c("id",
+                                                   "description")))
+                      assert_that(is.string(dye$id))
+                      assert_that(is.opt.string(dye$description))
+                    }
+                    names(new.dyes) < GetIds(new.dyes)
+                    private$.dye <- new.dyes
+                  },
+                  
+                  sample = function(new.samples) {
+                    if(missing(new.samples))
+                      return(private$.sample)
+                    assert_that(is.list(new.samples))
+                    for(sample in new.samples) {
+                      assert_that(is.list(sample))
+                      assert_that(has.only.names(sample,
+                                                 c("id",
+                                                   "description",
+                                                   "documentation",
+                                                   "xRef",
+                                                   "annotation",
+                                                   "type",
+                                                   "interRunCalibrator",
+                                                   "quantity",
+                                                   "calibratorSample",
+                                                   "cdnaSynthesisMethod",
+                                                   "templateQuantity")))
+                      assert_that(is.string(sample$id))
+                      assert_that(is.opt.string(sample$description))
+                      assert_that(is.opt.list(sample$documentation))
+                      for(doc in sample$documentation) {
+                        assert_that(has.only.names(doc,
+                                                   c("id")))
+                        assert_that(is.string(doc$id))
+                      }
+                      assert_that(is.opt.list(sample$xRef))
+                      for(xRef in sample$xRef) {
+                        assert_that(has.only.names(xRef,
+                                                   c("name",
+                                                     "id")))
+                        assert_that(is.opt.string(xRef$name))
+                        assert_that(is.opt.string(xRef$id))
+                      }
+                      assert_that(is.opt.list(sample$annotation))
+                      for(annotation in sample$annotation) {
+                        assert_that(has.only.names(annotation,
+                                                   c("property",
+                                                     "value")))
+                        assert_that(is.string(annotation$property))
+                        assert_that(is.string(annotation$value))
+                      }
+                      assert_that(is.string(sample$type))
+                      assert_that(is.opt.logical(sample$interRunCalibrator))
+                      assert_that(is.opt.list.one.el(sample$quantity))
+                      for(quantity in sample$quantity) {
+                        assert_that(has.only.names(quantity,
+                                                   c("value",
+                                                     "unit")))
+                        if(!is.na(quantity$value) &&
+                           !is.na(quantity$unit)) {
+                          assert_that(is.double(quantity$value))
+                          assert_that(is.string(quantity$unit))
+                        }
+                      }
+                      assert_that(is.opt.logical(sample$calibrationSample))
+                      assert_that(is.opt.list(sample$cdnaSynthesisMethod))                      
+                      assert_that(has.only.names(sample$cdnaSynthesisMethod,
+                                                 c("enzyme",
+                                                   "primingMethod",
+                                                   "dnaseTreatment",
+                                                   "thermalCyclingConditions")))
+                      assert_that(is.opt.string(sample$cdnaSynthesisMethod$enzyme))
+                      assert_that(is.opt.string(sample$cdnaSynthesisMethod$primingMethod))
+                      assert_that(is.opt.logical(sample$cdnaSynthesisMethod$dnaseTreatment))
+                      assert_that(is.opt.string(sample$cdnaSynthesisMethod$thermalCyclingConditions))
+                      
+                      assert_that(is.opt.list(sample$templateQuantity))
+                      
+                      assert_that(has.only.names(sample$templateQuantity,
+                                                 c("conc",
+                                                   "nucleotide")))
+                      assert_that(is.opt.double(sample$templateQuantity$conc))
+                      assert_that(is.opt.string(sample$templateQuantity$nucleotide))
+                      
+                    }
+                    names(new.samples) < GetIds(new.samples)
+                    private$.sample <- new.samples
+                  },
+                  
+                  target = function(new.targets) {
+                    if(missing(new.targets))
+                      return(private$.target)
+                    assert_that(is.list(new.targets))
+                    for(target in new.targets) {
+                      assert_that(is.list(target))
+                      assert_that(has.only.names(target,
+                                                 c("id",
+                                                   "description",
+                                                   "documentation",
+                                                   "xRef",                                                   
+                                                   "type",
+                                                   "amplificationEfficiencyMethod",
+                                                   "amplificationEfficiency",
+                                                   "amplificationEfficiencySE",
+                                                   "detectionLimit",
+                                                   "dyeId",
+                                                   "sequences",
+                                                   "commercialAssay")))
+                      assert_that(is.string(target$id))
+                      assert_that(is.opt.string(target$description))
+                      assert_that(is.opt.list(target$documentation))
+                      for(doc in target$documentation) {
+                        assert_that(has.only.names(doc,
+                                                   c("id")))
+                        assert_that(is.string(doc$id))
+                      }
+                      assert_that(is.opt.list(target$xRef))
+                      for(xRef in target$xRef) {
+                        assert_that(has.only.names(xRef,
+                                                   c("name",
+                                                     "id")))
+                        assert_that(is.opt.string(xRef$name))
+                        assert_that(is.opt.string(xRef$id))
+                      }                      
+                      assert_that(is.string(target$type))
+                      assert_that(is.opt.string(target$amplificationEfficiencyMethod))
+                      assert_that(is.opt.double(target$amplificationEfficiency))
+                      assert_that(is.opt.double(target$amplificationEfficiencySE))
+                      assert_that(is.opt.double(target$detectionLimit))
+                      assert_that(is.string(target$dyeId))
+                      
+                      assert_that(is.opt.list.one.el(target$sequences))
+                      for(sequences in target$sequences) {
+                        assert_that(has.only.names(sequences,
+                                                   c("forwardPrimer",
+                                                     "reversePrimer",
+                                                     "probe1",
+                                                     "probe2",
+                                                     "amplicon")))
+                        for(el in sequences) {
+                          assert_that(is.opt.list.one.el(el))
+                          assert_that(has.only.names(sequences,
+                                                     c("threePrimeTag",
+                                                       "fivePrimeTag",
+                                                       "sequence")))
+                          assert_that(is.opt.string(el$threePrimeTag))
+                          assert_that(is.opt.string(el$fivePrimeTag))
+                          assert_that(is.string(el$sequence))
+                        }
+                      }                      
+                      assert_that(is.opt.list.one.el(target$commercialAssay))
+                      for(commercialAssay in target$commercialAssay) {
+                        assert_that(has.only.names(commercialAssay,
+                                                   c("company",
+                                                     "orderNumber")))
+                        assert_that(is.string(commercialAssay$company))
+                        assert_that(is.string(commercialAssay$orderNumber))
+                      }
+                    }
+                    names(new.targets) < GetIds(new.targets)
+                    private$.target <- new.targets
+                  },
+                  
+                  thermalCyclingConditions = function(new.tccs) {
+                    if(missing(new.tccs))
+                      return(private$.thermalCyclingConditions)
+                    assert_that(is.list(new.tccs))
+                    for(tcc in new.tccs) {
+                      assert_that(is.list(tcc))
+                      assert_that(has.only.names(tcc,
+                                                 c("id",
+                                                   "description",
+                                                   "documentation",
+                                                   "lidTemperature",                                                   
+                                                   "experimenter",
+                                                   "step")))
+                      assert_that(is.string(tcc$id))
+                      assert_that(is.opt.string(tcc$description))
+                      assert_that(is.opt.list(tcc$documentation))
+                      for(doc in tcc$documentation) {
+                        assert_that(has.only.names(doc,
+                                                   c("id")))
+                        assert_that(is.string(doc$id))
+                      }
+                      assert_that(is.opt.double(tcc$lidTemperature))
+                      assert_that(is.opt.list(tcc$experimenter))
+                      for(experimenter in tcc$experimenter) {
+                        assert_that(has.only.names(experimenter,
+                                                   c("id")))
+                        assert_that(is.string(experimenter$id))
+                      }
+                      assert_that(is.list(tcc$step))
+                      for(step in tcc$step) {
+                        assert_that(has.only.names(step,
+                                                   c("nr",
+                                                     "description",
+                                                     "temperature",
+                                                     "gradient",
+                                                     "loop",
+                                                     "pause",
+                                                     "lidOpen")))
+                        assert_that(is.count(step$nr))
+                        assert_that(is.opt.string(step$description))
+                        assert_that(is.opt.list(step$temperature))
+                        
+                        assert_that(has.only.names(step$temperature,
+                                                   c("temperature",
+                                                     "duration",
+                                                     "temperatureChange",
+                                                     "durationChange",
+                                                     "measure",
+                                                     "ramp")))
+                        assert_that(is.opt.double(step$temperature$temperature))
+                        assert_that(is.opt.count(step$temperature$duration))
+                        assert_that(is.opt.double(step$temperature$temperatureChange))
+                        assert_that(is.opt.integer(step$temperature$durationChange))
+                        assert_that(is.opt.string(step$temperature$measure))
+                        assert_that(is.opt.double(step$temperature$ramp))
+                        
+                        assert_that(is.opt.list(step$gradient))
+                        assert_that(has.only.names(step$gradient,
+                                                   c("highTemperature",
+                                                     "lowTemperature",
+                                                     "duration",
+                                                     "temperatureChange",
+                                                     "durationChange",
+                                                     "measure",
+                                                     "ramp")))
+                        assert_that(is.opt.double(step$gradient$highTemperature))
+                        assert_that(is.opt.double(step$gradient$lowTemperature))
+                        assert_that(is.opt.count(step$gradient$duration))
+                        assert_that(is.opt.double(step$gradient$temperatureChange))
+                        assert_that(is.opt.integer(step$gradient$durationChange))
+                        assert_that(is.opt.string(step$gradient$measure))
+                        assert_that(is.opt.double(step$gradient$ramp))
+                        
+                        assert_that(is.opt.list(step$loop))                        
+                        assert_that(has.only.names(step$loop,
+                                                   c("goto",
+                                                     "repeatN")))                          
+                        assert_that(is.opt.count(step$loop$goto))
+                        assert_that(is.opt.count(step$loop$repeatN))
+                        
+                        assert_that(is.opt.list(step$pause))
+                        assert_that(has.only.names(step$pause,
+                                                   c("temperature")))                          
+                        assert_that(is.opt.double(step$pause$temperature))
+                        
+                        assert_that(is.opt.string(step$lidOpen))
+                      }
+                      
+                    }
+                    names(new.tccs) < GetIds(new.tccs)
+                    private$.thermalCyclingConditions <- new.tccs
+                  },
+                  
+                  experiment = function(new.experiments) {
+                    if(missing(new.experiments))
+                      return(private$.experiment)
+                    assert_that(is.list(new.experiments))
+                    for(exp in new.experiments) {
+                      assert_that(is.list(exp))
+                      assert_that(has.only.names(exp,
+                                                 c("id",
+                                                   "description",
+                                                   "documentation",
+                                                   "run")))
+                      assert_that(is.string(exp$id))
+                      assert_that(is.opt.string(exp$description))
+                      assert_that(is.opt.list(exp$documentation))
+                      for(doc in exp$documentation) {
+                        assert_that(has.only.names(doc,
+                                                   c("id")))
+                        assert_that(is.string(doc$id))
+                      }
+                      assert_that(is.list(exp$run))
+                      for(run in exp$run) {
+                        assert_that(is.list(run))
+                        assert_that(has.only.names(run,
+                                                   c("id",
+                                                     "description",
+                                                     "documentation",
+                                                     "experimenter",
+                                                     "instrument",
+                                                     "dataCollectionSoftware",
+                                                     "backgroundDeterminationMethod",
+                                                     "cqDetectionMethod",
+                                                     "thermalCyclingConditions",
+                                                     "pcrFormat",
+                                                     "runDate",                                                     
+                                                     "react")))
+                        assert_that(is.string(run$id))
+                        assert_that(is.opt.string(run$description))
+                        assert_that(is.opt.list(run$documentation))
+                        for(doc in run$documentation) {
+                          assert_that(has.only.names(doc,
+                                                     c("id")))
+                          assert_that(is.string(doc$id))
+                        }
+                        assert_that(is.opt.list(run$experimenter))
+                        for(expm in run$experimenter) {
+                          assert_that(has.only.names(expm,
+                                                     c("id")))
+                          assert_that(is.string(expm$id))
+                        }
+                        assert_that(is.opt.string(run$instrument))
+                        assert_that(is.opt.list(run$dataCollectionSoftware))
+                        assert_that(is.opt.string(run$dataCollectionSoftware$name))
+                        assert_that(is.opt.string(run$dataCollectionSoftware$version))
+                        assert_that(is.opt.string(run$backgroundDeterminationMethod))
+                        assert_that(is.opt.string(run$cqDetectionMethod))
+                        assert_that(is.opt.string(run$thermalCyclingConditions))
+                        assert_that(is.list(run$pcrFormat))
+                        assert_that(is.count(run$pcrFormat$rows))
+                        assert_that(is.count(run$pcrFormat$columns))
+                        assert_that(is.string(run$pcrFormat$rowLabel))
+                        assert_that(is.string(run$pcrFormat$columnLabel))
+                        assert_that(is.opt.string(run$runDate))
+                        assert_that(is.list(run$react))
+                        for(react in run$react) {
+                          assert_that(is.list(react))
+                          assert_that(has.only.names(react,
+                                                     c("id",
+                                                       "position",
+                                                       "sample",
+                                                       "data")))
+                          assert_that(is.count(react$id))
+                          assert_that(is.list(react$data))
+                          for(data in react$data) {
+                            assert_that(has.only.names(data,
+                                                       c("id", #id = tar
+                                                         "cq",
+                                                         "excl",
+                                                         "adp",
+                                                         "mdp",
+                                                         "endPt",
+                                                         "bgFluor",
+                                                         "bgFluorSlp",
+                                                         "quantFluor")))
+                            assert_that(is.string(data$id))
+                            assert_that(is.opt.double(data$cq))
+                            assert_that(is.opt.string(data$excl))
+                            assert_that(is.opt.double.matrix(data$adp))                            
+                            # add colnames assert
+                            assert_that(is.opt.double.matrix(data$mdp))                            
+                            
+                            assert_that(is.opt.double(data$endPt))
+                            assert_that(is.opt.double(data$bgFluor))                            
+                            assert_that(is.opt.double(data$bgFluorSlp))
+                            assert_that(is.opt.double(data$quantFluor))
+                          }
+                          names(react$data) <- GetIds(react$data)
+                        }
+                        names(run$react) <- GetIds(run$react)
+                      }
+                      names(exp$run) < GetIds(exp$run)                      
+                    }
+                    names(new.experiments) < GetIds(new.experiments)                    
+                    private$.experiment <- new.experiments
+                    private$.recalcPositions()
+                  },
+                  
+                  dilutions = function() {
+                    return(private$.dilutions)
+                  },
+                  
+                  conditions = function() {
+                    return(private$.conditions)
+                  }
+                  
+                )
+)

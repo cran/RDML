@@ -1,29 +1,32 @@
 Package: RDML
 Type: Package
-Title: Importing real-time thermo cycler (qPCR) data from RDML format
-        files
-Version: 0.4-2
+Title: Importing Real-Time Thermo Cycler (qPCR) Data from RDML Format
+        Files
+Version: 0.8-2
 LazyData: true
-Date: 2014-09-10
-Description: Imports real-time thermo cycler (qPCR) data from RDML format files and transforms to the appropriate formats of the 'qpcR' and 'chipPCR' packages.
+Date: 2015-04-02
+Description: Imports real-time thermo cycler (qPCR) data from Real-time PCR
+    Data Markup Language (RDML) format files and transforms to the appropriate
+    formats of the 'qpcR' and 'chipPCR' packages.
 Authors@R: c(
-    person("Konstantin A.", "Blagodatskikh", 
-      email = "k.blag@yandex.ru", role = c("cre", "aut")),
-    person("Stefan", "Roediger", 
-      email = "stefan.roedigier@hs-lausitz.de", 
-      role = "aut"),
-    person("Michal", "Burdukiewicz", 
-      email = "michalburdukiewicz@gmail.com", role = "aut"))
+    person("Konstantin A.", "Blagodatskikh",
+    email = "k.blag@yandex.ru", role = c("cre", "aut")),
+    person("Stefan", "Roediger",
+    email = "stefan.roediger@hs-lausitz.de",
+    role = "aut"),
+    person("Michal", "Burdukiewicz",
+    email = "michalburdukiewicz@gmail.com", role = "aut"))
 License: GPL (>= 2)
 URL: https://github.com/kablag/RDML
-Depends: XML (>= 3.98-1.1)
-Imports: chipPCR (>= 0.0.8-1)
-Suggests: qpcR (>= 1.3-9)
-Packaged: 2014-09-10 08:55:14 UTC; kablag
+Imports: R6, assertthat, XML, uuid, plyr, dplyr
+Collate: 'RDML.asserts.R' 'RDML.R' 'RDML.AsDendrogram.R'
+        'RDML.AsTable.R' 'RDML.GetFData.R' 'RDML.Merge.R'
+        'RDML.SetFData.R' 'RDML.init.R' 'names.RDML.R'
+Packaged: 2015-04-07 05:41:14 UTC; kablag
 Author: Konstantin A. Blagodatskikh [cre, aut],
   Stefan Roediger [aut],
   Michal Burdukiewicz [aut]
 Maintainer: Konstantin A. Blagodatskikh <k.blag@yandex.ru>
 NeedsCompilation: no
 Repository: CRAN
-Date/Publication: 2014-09-10 11:38:16
+Date/Publication: 2015-04-07 09:03:33

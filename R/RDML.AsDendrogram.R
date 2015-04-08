@@ -1,11 +1,11 @@
 #' Represents structure of \code{RDML} file as dendrogram
 #' 
-#' Plots and/or returns structure of \code{RDML} file as dendrogram tree
+#' Plots and/or returns structure of \code{RDML} file as dendrogram (tree view)
 #' 
 #' @param plot.dendrogram plots dendrogram if \code{TRUE}
 #' @return \code{dendrogram} object
 #' @author Konstantin A. Blagodatskikh <k.blag@@yandex.ru>, Stefan Roediger 
-#'   <stefan.roediger@@hs-lausitz.de>, Michal Burdukiewicz 
+#'   <stefan.roediger@@b-tu.de>, Michal Burdukiewicz 
 #'   <michalburdukiewicz@@gmail.com>
 #' @keywords manip
 #' @docType methods
@@ -106,6 +106,9 @@ RDML$set("public", "AsDendrogram",
                   at=xtick,
                   lty = "blank",
                   las = 2,
+                  labels = FALSE)
+             text(seq(0, 5, by=0.5),
+                  par("usr")[3] - 0.2,
                   labels = c("Number\nof samples",
                              "Data type",
                              "",
@@ -116,7 +119,8 @@ RDML$set("public", "AsDendrogram",
                              "Run ID",
                              "",
                              "Experiment ID",
-                             ""))
+                             ""),
+                  srt = 45, pos = 1, xpd = TRUE)
            }
            return(tree)},
          overwrite = TRUE)

@@ -168,6 +168,7 @@ GetRefGenesRoche <- function(uniq.folder)
 #'   against RDML data from devices: \emph{Bio-Rad CFX96}, \emph{Roche 
 #'   LightCycler 96} and \emph{Applied Biosystems StepOne}.
 #' @param input \code{string} -- path to RDML file
+#' @param conditions.sep separator for condition defined at sample name
 #' @author Konstantin A. Blagodatskikh <k.blag@@yandex.ru>, Stefan Roediger 
 #'   <stefan.roediger@@hs-lausitz.de>, Michal Burdukiewicz 
 #'   <michalburdukiewicz@@gmail.com>
@@ -188,7 +189,8 @@ GetRefGenesRoche <- function(uniq.folder)
 #' lc96$AsTable(name.pattern = sample[[react$sample]]$description)
 #' lc96$AsDendrogram()
 #' }
-RDML$set("public", "initialize", function(input) {  
+RDML$set("public", "initialize", function(input,
+                                          conditions.sep = NULL) {  
   if(missing(input)) return()
   assert_that(is.string(input))
   # Unzips RDML to unique folder to get inner XML content.
@@ -301,8 +303,9 @@ RDML$set("public", "initialize", function(input) {
               if(type == "ntp")
                 return(NULL)
               #####################
+              id <- xmlAttrs(sample, "id")
               list(
-                id = xmlAttrs(sample, "id"),
+                id = id,
                 description = xmlValue(sample[["description"]]),
                 documentation = llply(sample["documentation"],
                                       function(documentation)
@@ -314,11 +317,24 @@ RDML$set("public", "initialize", function(input) {
                                name = xmlValue(xRef[["name"]]),
                                id = xmlValue(xRef[["id"]])
                              )),
-                annotation = ldply(sample["annotation"],
-                                   function(annotation) c(
-                                     property = xmlValue(annotation[["property"]]),
-                                     value = xmlValue(annotation[["value"]])
-                                   )),
+                annotation = {
+                  annotations <- ldply(sample["annotation"],
+                                       function(annotation) 
+                                         data.frame(
+                                           property = xmlValue(annotation[["property"]]),
+                                           value = xmlValue(annotation[["value"]]),
+                                           stringsAsFactors = FALSE)
+                  )
+                  if(!is.null(conditions.sep))
+                    rbind(annotations,
+                          data.frame(
+                            property = "condition",
+                            value = gsub(sprintf("^.*%s(.*)$",
+                                                 conditions.sep),
+                                         "\\1", id),
+                            stringsAsFactors = FALSE))
+                  annotations
+                },
                 type = type,
                 interRunCalibrator = as.logical(xmlValue(sample[["interRunCalibrator"]])),
                 quantity = list(value = as.numeric(xmlValue(sample[["quantity"]][["value"]])),
@@ -350,76 +366,76 @@ RDML$set("public", "initialize", function(input) {
                            list(
                              id = { 
                                ifelse(length(private$.id) != 0 &&
-                                 private$.id[[1]]$publisher == "Roche Diagnostics",
-                                      {
-                                        id <- xmlAttrs(target, "id")
-                                        gsub("@(.+)$", "\\1", 
-                                             regmatches(id,gregexpr("@(.+)$",id))[[1]])
-                                      },
-                                      xmlAttrs(target, "id"))}
-                             ,
-                             description = xmlValue(target[["description"]]),
-                             documentation = llply(target["documentation"],
-                                                   function(documentation)
-                                                     if(!is.null(documentation))
-                                                       xmlAttrs(documentation, "id")
-                             ),
-                             xRef = llply(target["xRef"],
-                                          function(xRef) c(
-                                            name = xmlValue(xRef[["name"]]),
-                                            id = xmlValue(xRef[["id"]])
-                                          )),
-                             type = xmlValue(target[["type"]]),
-                             amplificationEfficiencyMethod = 
-                               xmlValue(target[["amplificationEfficiencyMethod"]]),
-                             amplificationEfficiency = 
-                               as.numeric(xmlValue(target[["amplificationEfficiency"]])),
-                             amplificationEfficiencySE = 
-                               as.numeric(xmlValue(target[["amplificationEfficiencySE"]])),
-                             detectionLimit = 
-                               as.numeric(xmlValue(target[["detectionLimit"]])),
-                             dyeId = { 
-                               id <- xmlAttrs(target[["dyeId"]],"id")
-                               if(is.null(id)) NA
-                               else id
-                             },
-                             sequences = list(
-                               forwardPrimer = c(threePrimeTag = 
-                                                   xmlValue(target[["sequences"]][["forwardPrimer"]][["threePrimeTag"]]),
-                                                 fivePrimeTag = 
-                                                   xmlValue(target[["sequences"]][["forwardPrimer"]][["fivePrimeTag"]]),
-                                                 sequence = 
-                                                   xmlValue(target[["sequences"]][["forwardPrimer"]][["sequence"]])),
-                               reversePrimer = c(threePrimeTag = 
-                                                   xmlValue(target[["sequences"]][["reversePrimer"]][["threePrimeTag"]]),
-                                                 fivePrimeTag = 
-                                                   xmlValue(target[["sequences"]][["reversePrimer"]][["fivePrimeTag"]]),
-                                                 sequence = 
-                                                   xmlValue(target[["sequences"]][["reversePrimer"]][["sequence"]])),
-                               probe1 = c(threePrimeTag = 
-                                            xmlValue(target[["sequences"]][["probe1"]][["threePrimeTag"]]),
-                                          fivePrimeTag = 
-                                            xmlValue(target[["sequences"]][["probe1"]][["fivePrimeTag"]]),
-                                          sequence = 
-                                            xmlValue(target[["sequences"]][["probe1"]][["sequence"]])),
-                               probe2 = c(threePrimeTag = 
-                                            xmlValue(target[["sequences"]][["probe2"]][["threePrimeTag"]]),
-                                          fivePrimeTag = 
-                                            xmlValue(target[["sequences"]][["probe2"]][["fivePrimeTag"]]),
-                                          sequence = 
-                                            xmlValue(target[["sequences"]][["probe2"]][["sequence"]])),
-                               amplicon = c(threePrimeTag = 
-                                              xmlValue(target[["sequences"]][["amplicon"]][["threePrimeTag"]]),
-                                            fivePrimeTag = 
-                                              xmlValue(target[["sequences"]][["amplicon"]][["fivePrimeTag"]]),
-                                            sequence = 
-                                              xmlValue(target[["sequences"]][["amplicon"]][["sequence"]]))
-                             ),
-                             commercialAssay = list(company = 
-                                                      xmlValue(target[["commercialAssay"]][["company"]]),
-                                                    orderNumber = 
-                                                      xmlValue(target[["commercialAssay"]][["orderNumber"]]))
-                             
+                                        private$.id[[1]]$publisher == "Roche Diagnostics",
+  {
+    id <- xmlAttrs(target, "id")
+    gsub("@(.+)$", "\\1", 
+         regmatches(id,gregexpr("@(.+)$",id))[[1]])
+  },
+  xmlAttrs(target, "id"))}
+  ,
+  description = xmlValue(target[["description"]]),
+  documentation = llply(target["documentation"],
+                        function(documentation)
+                          if(!is.null(documentation))
+                            xmlAttrs(documentation, "id")
+  ),
+  xRef = llply(target["xRef"],
+               function(xRef) c(
+                 name = xmlValue(xRef[["name"]]),
+                 id = xmlValue(xRef[["id"]])
+               )),
+  type = xmlValue(target[["type"]]),
+  amplificationEfficiencyMethod = 
+    xmlValue(target[["amplificationEfficiencyMethod"]]),
+  amplificationEfficiency = 
+    as.numeric(xmlValue(target[["amplificationEfficiency"]])),
+  amplificationEfficiencySE = 
+    as.numeric(xmlValue(target[["amplificationEfficiencySE"]])),
+  detectionLimit = 
+    as.numeric(xmlValue(target[["detectionLimit"]])),
+  dyeId = { 
+    id <- xmlAttrs(target[["dyeId"]],"id")
+    if(is.null(id)) NA
+    else id
+  },
+  sequences = list(
+    forwardPrimer = c(threePrimeTag = 
+                        xmlValue(target[["sequences"]][["forwardPrimer"]][["threePrimeTag"]]),
+                      fivePrimeTag = 
+                        xmlValue(target[["sequences"]][["forwardPrimer"]][["fivePrimeTag"]]),
+                      sequence = 
+                        xmlValue(target[["sequences"]][["forwardPrimer"]][["sequence"]])),
+    reversePrimer = c(threePrimeTag = 
+                        xmlValue(target[["sequences"]][["reversePrimer"]][["threePrimeTag"]]),
+                      fivePrimeTag = 
+                        xmlValue(target[["sequences"]][["reversePrimer"]][["fivePrimeTag"]]),
+                      sequence = 
+                        xmlValue(target[["sequences"]][["reversePrimer"]][["sequence"]])),
+    probe1 = c(threePrimeTag = 
+                 xmlValue(target[["sequences"]][["probe1"]][["threePrimeTag"]]),
+               fivePrimeTag = 
+                 xmlValue(target[["sequences"]][["probe1"]][["fivePrimeTag"]]),
+               sequence = 
+                 xmlValue(target[["sequences"]][["probe1"]][["sequence"]])),
+    probe2 = c(threePrimeTag = 
+                 xmlValue(target[["sequences"]][["probe2"]][["threePrimeTag"]]),
+               fivePrimeTag = 
+                 xmlValue(target[["sequences"]][["probe2"]][["fivePrimeTag"]]),
+               sequence = 
+                 xmlValue(target[["sequences"]][["probe2"]][["sequence"]])),
+    amplicon = c(threePrimeTag = 
+                   xmlValue(target[["sequences"]][["amplicon"]][["threePrimeTag"]]),
+                 fivePrimeTag = 
+                   xmlValue(target[["sequences"]][["amplicon"]][["fivePrimeTag"]]),
+                 sequence = 
+                   xmlValue(target[["sequences"]][["amplicon"]][["sequence"]]))
+  ),
+  commercialAssay = list(company = 
+                           xmlValue(target[["commercialAssay"]][["company"]]),
+                         orderNumber = 
+                           xmlValue(target[["commercialAssay"]][["orderNumber"]]))
+  
                            )
                          }
     )
@@ -630,7 +646,7 @@ RDML$set("public", "initialize", function(input) {
     run.id <-xmlAttrs(run, "id")
     cat(sprintf("\nrun: %s\n", run.id))
     list(
-      id = xmlAttrs(run, "id"),
+      id = run.id, #xmlAttrs(run, "id"),
       description = xmlValue(run[["description"]]),
       documentation = llply(run["documentation"],
                             function(documentation)
@@ -683,7 +699,9 @@ RDML$set("public", "initialize", function(input) {
                                          experiment.id,
                                          run.id),
                 .parallel = FALSE,
-                .progress = "text"
+                .progress = ifelse(interactive(),
+                                   "text",
+                                   "none")
           )
         names(react.list) <- GetIds(react.list)
         compact(react.list)                                
@@ -727,42 +745,58 @@ RDML$set("public", "initialize", function(input) {
   }
   
   private$.recalcPositions()
-  if(!is.null(ref.genes.r) && length(ref.genes.r) != 0) {
-    for(ref.gene in ref.genes.r) {
-      geneName <- xmlValue(ref.gene[["geneName"]])
-      geneI <- grep(
-        geneName,
-        names(private$.target))
-      private$.target[[geneI]]$type <-
-        ifelse(as.logical(xmlValue(ref.gene[["isReference"]])),
-               "ref",
-               "toi")
-    }
-  }
-  
   
   if(length(private$.id) != 0 && private$.id[[1]]$publisher == "Roche Diagnostics") {    
     for(i in 1:length(private$.sample)) {
       private$.sample[[i]]$id <- private$.sample[[i]]$description
     }
     names(private$.sample) <- GetIds(private$.sample)
-    if(!is.null(dilutions.r)) {
-      cat("Adding Roche standards")
-      for(conc.i in 1:length(dilutions.r[[1]])) {
-        sample.id <- private$.experiment[[1]]$run[[1]]$react[[
-          which(names(private$.experiment[[1]]$run[[1]]$react) == 
-                  names(dilutions.r[[1]])[conc.i])]]$sample      
-        private$.sample[[sample.id]]$quantity <- list(
-          value = unname(dilutions.r[[1]][conc.i]),
-          unit = "other"
-        )
+    
+    cat("Adding Roche ref genes\n")
+    if(!is.null(ref.genes.r) && length(ref.genes.r) != 0) {
+      for(ref.gene in ref.genes.r) {
+        geneName <- xmlValue(ref.gene[["geneName"]])
+        geneI <- grep(
+          sprintf("^%s$", geneName),
+          names(private$.target))
+        private$.target[[geneI]]$type <-
+          ifelse(as.logical(xmlValue(ref.gene[["isReference"]])),
+                 "ref",
+                 "toi")
       }
     }
     
-    private$.dilutions[[private$.experiment[[1]]$id]] <-
-      dilutions.r
-    private$.conditions[[private$.experiment[[1]]$id]] <-
-      conditions.r
+    tbl <- self$AsTable()
+    cat("Adding Roche quantities\n")
+    for(target in dilutions.r %>% names) {
+      for(r.id in dilutions.r[[target]] %>% names) {
+        sample.name <- filter(tbl, react.id == r.id)$sample[1]
+        private$.sample[[sample.name]]$quantity <- list(
+          value = unname(dilutions.r[[1]][r.id]),
+          unit = "other"
+        )
+        private$.sample[[sample.name]]$annotation <- 
+          rbind(private$.sample[[sample.name]]$annotation,
+                data.frame(
+                  property = sprintf("Roche_quantity_at_%s_%s",
+                                     target,
+                                     r.id),
+                  value = dilutions.r[[target]][r.id],
+                  stringsAsFactors = FALSE))
+      }
+    }
+    
+    cat("Adding Roche conditions\n")
+    for(r.id in conditions.r %>% names) {
+      sample.name <- filter(tbl, react.id == r.id)$sample[1]
+      private$.sample[[sample.name]]$annotation <- 
+        rbind(private$.sample[[sample.name]]$annotation,
+              data.frame(
+                property = sprintf("Roche_condition_at_%s",r.id),
+                value = conditions.r[r.id],
+                stringsAsFactors = FALSE))
+    }
+    
   }
 }, 
 overwrite = TRUE)

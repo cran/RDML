@@ -1,3 +1,7 @@
+Changes from Version 0.8-3 to 0.8-4 [April 19 2015]
+* progress bar disabled at non interactive mode
+* conditions and quantities moved to sample attributes
+
 Changes from Version 0.8-2 to 0.8-3 [April 8 2015]
 * uuid usage removed
 
@@ -10,7 +14,7 @@ Changes from Version 0.7-1 to 0.8-1 [January 27 2015]
 
 Changes from Version 0.6-1 to 0.7-1 [September 23 2014]
 * Added plot S3
-* RDML rewrited as R6 object
+* RDML rewrote as R6 object
 
 Changes from Version 0.6 to 0.6-1 [September 23 2014] 
 * flat.table option removed from RDML function

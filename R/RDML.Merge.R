@@ -1,14 +1,13 @@
 #' Merges \code{RDML} objects
 #' 
-#' Merges one \code{RDML} object into another.
+#' Merges list of \code{RDML} objects. First object in list becomes base object.
 #' 
-#' @param to.merge \code{RDML} object that should be merged into current object.
+#' @param to.merge \code{RDML} objects that should be merged.
 #' 
 #' @docType methods
-#' @name Merge
-#' @aliases RDML.Merge
-#' @rdname merge-method
+#' @name MergeRDMLs
 #' @include RDML.R
+#' @export
 #' @examples
 #' \dontrun{
 #' PATH <- path.package("RDML")
@@ -16,27 +15,28 @@
 #' lc96 <- RDML$new(filename)
 #' filename <- paste(PATH, "/extdata/", "stepone_std.rdml", sep ="")
 #' stepone <- RDML$new(filename)
-#' lc96$Merge(stepone)
-#' lc96$AsTable()
+#' merged <- MergeRDMLs(list(lc96,stepone))
+#' merged$AsDendrogram()
 #' }
-RDML$set("public", "Merge",
-         function(to.merge) {
-           
-           for(element in c("id",
-                            "experimenter",
-                            "documentation",
-                            "dye",
-                            "sample",
-                            "target",
-                            "thermalCyclingConditions",
-                            "experiment"
-                            )) {
-             private[[paste0(".", element)]] <- 
-               c(private[[paste0(".", element)]],
-                 to.merge[[element]])
-             private[[paste0(".", element)]] <- 
-               private[[paste0(".", element)]][unique(
-                 names(private[[paste0(".", element)]]))]
-           }
-         }
-         , overwrite = TRUE)
+MergeRDMLs <- function(to.merge) {
+  baseRDML <- to.merge[[1]]$clone(deep = TRUE)
+  for(rdml in to.merge[-1]) {
+    for(element in c("id",
+                     "experimenter",
+                     "documentation",
+                     "dye",
+                     "sample",
+                     "target",
+                     "thermalCyclingConditions",
+                     "experiment"
+    )) {
+      if (length(rdml[[element]]) != 0)
+        baseRDML[[element]] <- c(baseRDML[[element]],
+                                 llply(rdml[[element]],
+                                  function(subelement) subelement$clone(
+                                    deep = TRUE
+                                  )))
+    }
+  }
+  baseRDML
+}

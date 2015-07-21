@@ -29,8 +29,7 @@
 #'   <michalburdukiewicz@@gmail.com>
 #' @keywords manip
 #' @docType methods
-#' @name AsTable
-#' @aliases RDML.AsTable
+#' @name RDML.AsTable
 #' @rdname astable-method
 #' @include RDML.R
 #' @examples
@@ -46,9 +45,9 @@
 #' ## Names for fluorescense data will contain sample name and react 
 #' ## positions
 #' tab <- stepone$AsTable(
-#'          name.pattern = paste(react$sample, react$position),
+#'          name.pattern = paste(react$sample$id, react$position),
 #'          cq30 = if(data$cq >= 30) ">=30" else "<30",
-#'          quantity = as.factor(sample[[react$sample]]$quantity$value)
+#'          quantity = as.factor(sample[[react$sample$id]]$quantity$value)
 #'          )
 #' ## Show cq30 and quantities
 #' tab[c("cq30", "quantity")]
@@ -60,7 +59,7 @@
 #'            long.table = TRUE)
 #' ## Plot fdata with colour by cq30 and shape by quantity
 #' library(ggplot2)
-#' ggplot(fdata, aes(x = cyc, y = fluo,
+#' ggplot(fdata, aes(x = cyc, y = fluor,
 #'                   group = fdata.name,
 #'                   colour = cq30,
 #'                   shape = quantity)) +
@@ -69,19 +68,21 @@
 RDML$set("public", "AsTable",
          function(
            .default = list(
-             exp.id = experiment$id,
-             run.id = run$id,
-             react.id = react$id,
-             position = react$position,
-             sample = react$sample,
-             target = data$id,
-             target.dyeId = target[[data$id]]$dyeId,
-             sample.type = sample[[react$sample]]$type),
+             exp.id = experiment$id$id,
+             run.id = run$id$id,
+             react.id = react$id$id,
+             position = react$Position(run$pcrFormat),
+             sample = react$sample$id,
+             target = data$tar$id,
+             target.dyeId = target[[data$tar$id]]$dyeId$id,
+             sample.type = sample[[react$sample$id]]$type$value,
+             adp = !is.null(data$adp),
+             mdp = !is.null(data$mdp)),
            name.pattern = paste(
-             react$position,
-             react$sample,
-             private$.sample[[react$sample]]$type,
-             data$id,
+             react$Position(run$pcrFormat),
+             react$sample$id,
+             private$.sample[[react$sample$id]]$type$value,
+             data$tar$id,
              sep = "_"),                    
            ...) {
            # create short names
@@ -94,8 +95,8 @@ RDML$set("public", "AsTable",
            sample <- private$.sample
            target <- private$.target
            thermalCyclingConditions <- private$.thermalCyclingConditions
-           dilutions <- private$.dilutions
-           conditions <- private$.conditions
+           # dilutions <- private$.dilutions
+           # conditions <- private$.conditions
            
            out<-data.frame()
            for(experiment in private$.experiment) {                      

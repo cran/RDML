@@ -9,8 +9,7 @@
 #'   <michalburdukiewicz@@gmail.com>
 #' @keywords manip
 #' @docType methods
-#' @name AsDendrogram
-#' @aliases RDML.AsDendrogram
+#' @name RDML.AsDendrogram
 #' @rdname asdendrogram-method
 #' @include RDML.R
 #' @examples
@@ -23,17 +22,26 @@
 RDML$set("public", "AsDendrogram",
          function(plot.dendrogram = TRUE) {
            
-           total.table <- self$AsTable(adp = !all(is.na(data$adp)),
-                                       mdp = !all(is.na(data$mdp)))
-           tree<-list()
-           attributes(tree)<-list(members = 0, height = 5)
-           class(tree)<-"dendrogram"
+           cut.text <- function(text) {
+             if (nchar(text) > 9) {
+               text <- paste0(substr(text, 1,3),
+                              "...",
+                              substr(text, nchar(text) - 2, nchar(text)))
+             }
+             text
+           }
+           
+           total.table <- self$AsTable()
+           
+           tree <- list()
+           attributes(tree) <- list(members = 0, height = 5)
+           class(tree) <- "dendrogram"
            for(exper.id in unique(total.table$exp.id)) {
              
              tree[[exper.id]] <- list()
              attributes(tree[[exper.id]]) <- list(members = 0,
                                                   height = 4,
-                                                  edgetext = exper.id)
+                                                  edgetext = cut.text(exper.id))
              for(r.id in total.table %>% 
                  filter(exp.id == exper.id) %>% 
                  .$run.id %>% unique) {
@@ -41,7 +49,7 @@ RDML$set("public", "AsDendrogram",
                attributes(tree[[exper.id]][[r.id]]) <- 
                  list(members = 0,
                       height = 3,
-                      edgetext = r.id)
+                      edgetext = cut.text(r.id))
                for(trgt in total.table %>% 
                    filter(exp.id == exper.id,
                           run.id == r.id) %>% 
@@ -51,7 +59,7 @@ RDML$set("public", "AsDendrogram",
                  attributes(tree[[exper.id]][[r.id]][[trgt]]) <- 
                    list(members = 0,
                         height = 2,
-                        edgetext = trgt)
+                        edgetext = cut.text(trgt))
                  for(stype in total.table %>% 
                      filter(exp.id == exper.id,
                             run.id == r.id,
@@ -61,7 +69,7 @@ RDML$set("public", "AsDendrogram",
                    attributes(tree[[exper.id]][[r.id]][[trgt]][[stype]]) <- 
                      list(members = 0,
                           height = 1,
-                          edgetext = stype)
+                          edgetext = cut.text(stype))
                    for(exp.type in c("adp", "mdp")) {
                      n.rows <- total.table %>% 
                        filter(exp.id == exper.id,
@@ -111,7 +119,7 @@ RDML$set("public", "AsDendrogram",
                   labels = FALSE)
              text(seq(0, 5, by=0.5),
                   par("usr")[3] - 0.2,
-                  labels = c("Number\nof samples",
+                  labels = c("Number\nof reacts",
                              "Data type",
                              "",
                              "Sample\ntype",

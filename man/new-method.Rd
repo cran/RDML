@@ -6,7 +6,7 @@
 \alias{new}
 \title{Creates new instance of \code{RDML} class object}
 \arguments{
-\item{input}{\code{string} -- path to RDML file}
+\item{filename}{\code{string} -- path to RDML file}
 
 \item{conditions.sep}{separator for condition defined at sample name}
 }
@@ -28,7 +28,7 @@ filename <- paste(PATH, "/extdata/", "lc96_bACTXY.rdml", sep ="")
 lc96 <- RDML$new(filename)
 
 ## Some kind of overview for lc96
-lc96$AsTable(name.pattern = sample[[react$sample]]$description)
+lc96$AsTable(name.pattern = sample[[react$sample$id]]$description)
 lc96$AsDendrogram()
 }
 }

@@ -1,4 +1,4 @@
-![RDML](https://github.com/kablag/RDML/blob/master/inst/RDML_gui/www/RDML_logo.png)
+![RDML](https://github.com/kablag/RDML/blob/master/vignettes/RDML_logo.png)
 
 
 Imports qPCR data from RDML v1.1 format files (Lefever et al. 2009) and 
@@ -17,7 +17,7 @@ Installation
 
 You can install the latest development version of the code using the `devtools` R package.
 
-```
+```r
 # Install devtools, if you haven't already.
 install.packages("devtools")
 

@@ -4,10 +4,7 @@
 #' of experiment.
 #' 
 #' @param request Output from AsTable method(\link{RDML.AsTable})
-#' @param limits \code{vector} with two values (min and max values) that limits
-#' cycles or temperature that should be gotten. If this values are smaller or bigger 
-#' than min or max values at dats - NA will be used.
-#' @param data.type Type of fluorescence data (i.e. 'adp' for qPCR or 'mdp' for
+#' @param dp.type Type of fluorescence data (i.e. 'adp' for qPCR or 'mdp' for
 #'   melting)
 #' @param long.table Output table is ready for ggplot (See \link{RDML.AsTable}
 #'   for example)
@@ -33,9 +30,9 @@
 #' ## Select melting fluorescence data with sample.type 'unkn'.
 #' library(dplyr)
 #' tab <- cfx96$AsTable()
-#' fdata <- cfx96$GetFData(filter(tab, sample.type == "unkn")
-#'                         data.type = "mdp")
-#' ## Show names for getted fdata
+#' fdata <- cfx96$GetFData(filter(tab, sample.type == "unkn"),
+#'                         dp.type = "adp")
+#' ## Show names for obtained fdata
 #' colnames(fdata)
 #' }
 RDML$set("public", "GetFData",
@@ -43,31 +40,25 @@ RDML$set("public", "GetFData",
                   limits = NULL,
                   dp.type = "adp",
                   long.table = FALSE) {
+           if (missing(request))
+             request <- self$AsTable()
+           else
+             request <- data.table(request)
+           if (length(unique(request$fdata.name)) != length(request$fdata.name)) {
+             warning("fdata.name column has duplicates! Generating new by exp.id, run.id, react.id and target")
+             request[, fdata.name := paste(exp.id, run.id, react.id, target, sep = "_"),
+                     by = .(exp.id, run.id, react.id, target)]
+           }
            out <- 
-             ddply(request, .(fdata.name), function(el) {
-               private$.experiment[[el$exp.id]]$run[[el$run.id]]$react[[as.character(
-                 el$react.id)]]$data[[el$target]]$AsDataFrame(dp.type = dp.type) %>% 
-                 cbind(fdata.name = el$fdata.name)
-             },
-             .id = "fdata.name"
+             request[, self$experiment[[exp.id]]$run[[run.id]]$react[[as.character(
+               react.id)]]$data[[target]]$GetFData(dp.type = dp.type), by = .(fdata.name)]
+           ifelse(long.table == FALSE,
+             return(dcast(out,
+                          as.formula(sprintf("%s ~ fdata.name",
+                                             ifelse(dp.type == "adp",
+                                                    "cyc", "tmp"))),
+                          value.var = "fluor")),
+             return(merge(request, out, by = "fdata.name"))
            )
-           ## Asserts for limits
-           if (!is.null(limits)) {
-             out <- out[out[, 1] >= limits[1] & out[, 1] <= limits[2], ]
-           }
-           if (long.table == FALSE) {
-             out <- out %>%
-               spread(fdata.name,
-                      fluor)
-           } else {
-             rownames(request) <- request$fdata.name
-             for(param in colnames(request)[-1]) {
-               for(fn in request$fdata.name) {
-                 out[out$fdata.name == fn,
-                     param] <- request[fn, param]
-               }
-             }
-           }
-           out
          }, 
          overwrite = TRUE)

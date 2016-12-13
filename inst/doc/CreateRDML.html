@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<meta name="author" content="Konstantin A. Blagodatskikh, Michał Burdukiewicz, Stefan Rödiger" />
+
+<meta name="date" content="2016-12-13" />
+
+<title>Creating RDML file from raw data</title>
+
+
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+div.sourceCode { overflow-x: auto; }
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code > span.dt { color: #902000; } /* DataType */
+code > span.dv { color: #40a070; } /* DecVal */
+code > span.bn { color: #40a070; } /* BaseN */
+code > span.fl { color: #40a070; } /* Float */
+code > span.ch { color: #4070a0; } /* Char */
+code > span.st { color: #4070a0; } /* String */
+code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code > span.ot { color: #007020; } /* Other */
+code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code > span.fu { color: #06287e; } /* Function */
+code > span.er { color: #ff0000; font-weight: bold; } /* Error */
+code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #880000; } /* Constant */
+code > span.sc { color: #4070a0; } /* SpecialChar */
+code > span.vs { color: #4070a0; } /* VerbatimString */
+code > span.ss { color: #bb6688; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { color: #19177c; } /* Variable */
+code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #666666; } /* Operator */
+code > span.bu { } /* BuiltIn */
+code > span.ex { } /* Extension */
+code > span.pp { color: #bc7a00; } /* Preprocessor */
+code > span.at { color: #7d9029; } /* Attribute */
+code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+</style>
+
+
+
+<link href="data:text/css;charset=utf-8,body%20%7B%0Abackground%2Dcolor%3A%20%23fff%3B%0Amargin%3A%201em%20auto%3B%0Amax%2Dwidth%3A%20700px%3B%0Aoverflow%3A%20visible%3B%0Apadding%2Dleft%3A%202em%3B%0Apadding%2Dright%3A%202em%3B%0Afont%2Dfamily%3A%20%22Open%20Sans%22%2C%20%22Helvetica%20Neue%22%2C%20Helvetica%2C%20Arial%2C%20sans%2Dserif%3B%0Afont%2Dsize%3A%2014px%3B%0Aline%2Dheight%3A%201%2E35%3B%0A%7D%0A%23header%20%7B%0Atext%2Dalign%3A%20center%3B%0A%7D%0A%23TOC%20%7B%0Aclear%3A%20both%3B%0Amargin%3A%200%200%2010px%2010px%3B%0Apadding%3A%204px%3B%0Awidth%3A%20400px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Aborder%2Dradius%3A%205px%3B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Afont%2Dsize%3A%2013px%3B%0Aline%2Dheight%3A%201%2E3%3B%0A%7D%0A%23TOC%20%2Etoctitle%20%7B%0Afont%2Dweight%3A%20bold%3B%0Afont%2Dsize%3A%2015px%3B%0Amargin%2Dleft%3A%205px%3B%0A%7D%0A%23TOC%20ul%20%7B%0Apadding%2Dleft%3A%2040px%3B%0Amargin%2Dleft%3A%20%2D1%2E5em%3B%0Amargin%2Dtop%3A%205px%3B%0Amargin%2Dbottom%3A%205px%3B%0A%7D%0A%23TOC%20ul%20ul%20%7B%0Amargin%2Dleft%3A%20%2D2em%3B%0A%7D%0A%23TOC%20li%20%7B%0Aline%2Dheight%3A%2016px%3B%0A%7D%0Atable%20%7B%0Amargin%3A%201em%20auto%3B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dcolor%3A%20%23DDDDDD%3B%0Aborder%2Dstyle%3A%20outset%3B%0Aborder%2Dcollapse%3A%20collapse%3B%0A%7D%0Atable%20th%20%7B%0Aborder%2Dwidth%3A%202px%3B%0Apadding%3A%205px%3B%0Aborder%2Dstyle%3A%20inset%3B%0A%7D%0Atable%20td%20%7B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dstyle%3A%20inset%3B%0Aline%2Dheight%3A%2018px%3B%0Apadding%3A%205px%205px%3B%0A%7D%0Atable%2C%20table%20th%2C%20table%20td%20%7B%0Aborder%2Dleft%2Dstyle%3A%20none%3B%0Aborder%2Dright%2Dstyle%3A%20none%3B%0A%7D%0Atable%20thead%2C%20table%20tr%2Eeven%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Ap%20%7B%0Amargin%3A%200%2E5em%200%3B%0A%7D%0Ablockquote%20%7B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Apadding%3A%200%2E25em%200%2E75em%3B%0A%7D%0Ahr%20%7B%0Aborder%2Dstyle%3A%20solid%3B%0Aborder%3A%20none%3B%0Aborder%2Dtop%3A%201px%20solid%20%23777%3B%0Amargin%3A%2028px%200%3B%0A%7D%0Adl%20%7B%0Amargin%2Dleft%3A%200%3B%0A%7D%0Adl%20dd%20%7B%0Amargin%2Dbottom%3A%2013px%3B%0Amargin%2Dleft%3A%2013px%3B%0A%7D%0Adl%20dt%20%7B%0Afont%2Dweight%3A%20bold%3B%0A%7D%0Aul%20%7B%0Amargin%2Dtop%3A%200%3B%0A%7D%0Aul%20li%20%7B%0Alist%2Dstyle%3A%20circle%20outside%3B%0A%7D%0Aul%20ul%20%7B%0Amargin%2Dbottom%3A%200%3B%0A%7D%0Apre%2C%20code%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0Aborder%2Dradius%3A%203px%3B%0Acolor%3A%20%23333%3B%0Awhite%2Dspace%3A%20pre%2Dwrap%3B%20%0A%7D%0Apre%20%7B%0Aborder%2Dradius%3A%203px%3B%0Amargin%3A%205px%200px%2010px%200px%3B%0Apadding%3A%2010px%3B%0A%7D%0Apre%3Anot%28%5Bclass%5D%29%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Acode%20%7B%0Afont%2Dfamily%3A%20Consolas%2C%20Monaco%2C%20%27Courier%20New%27%2C%20monospace%3B%0Afont%2Dsize%3A%2085%25%3B%0A%7D%0Ap%20%3E%20code%2C%20li%20%3E%20code%20%7B%0Apadding%3A%202px%200px%3B%0A%7D%0Adiv%2Efigure%20%7B%0Atext%2Dalign%3A%20center%3B%0A%7D%0Aimg%20%7B%0Abackground%2Dcolor%3A%20%23FFFFFF%3B%0Apadding%3A%202px%3B%0Aborder%3A%201px%20solid%20%23DDDDDD%3B%0Aborder%2Dradius%3A%203px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Amargin%3A%200%205px%3B%0A%7D%0Ah1%20%7B%0Amargin%2Dtop%3A%200%3B%0Afont%2Dsize%3A%2035px%3B%0Aline%2Dheight%3A%2040px%3B%0A%7D%0Ah2%20%7B%0Aborder%2Dbottom%3A%204px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Apadding%2Dbottom%3A%202px%3B%0Afont%2Dsize%3A%20145%25%3B%0A%7D%0Ah3%20%7B%0Aborder%2Dbottom%3A%202px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Afont%2Dsize%3A%20120%25%3B%0A%7D%0Ah4%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23f7f7f7%3B%0Amargin%2Dleft%3A%208px%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Ah5%2C%20h6%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23ccc%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Aa%20%7B%0Acolor%3A%20%230033dd%3B%0Atext%2Ddecoration%3A%20none%3B%0A%7D%0Aa%3Ahover%20%7B%0Acolor%3A%20%236666ff%3B%20%7D%0Aa%3Avisited%20%7B%0Acolor%3A%20%23800080%3B%20%7D%0Aa%3Avisited%3Ahover%20%7B%0Acolor%3A%20%23BB00BB%3B%20%7D%0Aa%5Bhref%5E%3D%22http%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0Aa%5Bhref%5E%3D%22https%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0A%0Acode%20%3E%20span%2Ekw%20%7B%20color%3A%20%23555%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Edt%20%7B%20color%3A%20%23902000%3B%20%7D%20%0Acode%20%3E%20span%2Edv%20%7B%20color%3A%20%2340a070%3B%20%7D%20%0Acode%20%3E%20span%2Ebn%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Efl%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Ech%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Est%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Eco%20%7B%20color%3A%20%23888888%3B%20font%2Dstyle%3A%20italic%3B%20%7D%20%0Acode%20%3E%20span%2Eot%20%7B%20color%3A%20%23007020%3B%20%7D%20%0Acode%20%3E%20span%2Eal%20%7B%20color%3A%20%23ff0000%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Efu%20%7B%20color%3A%20%23900%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%20code%20%3E%20span%2Eer%20%7B%20color%3A%20%23a61717%3B%20background%2Dcolor%3A%20%23e3d2d2%3B%20%7D%20%0A" rel="stylesheet" type="text/css" />
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Creating RDML file from raw data</h1>
+<h4 class="author"><em>Konstantin A. Blagodatskikh, Michał Burdukiewicz, Stefan Rödiger</em></h4>
+<h4 class="date"><em>2016-12-13</em></h4>
+
+
+
+<div id="creating-rdml-file-from-raw-data" class="section level1">
+<h1>Creating RDML file from raw data</h1>
+<p>This vignette describes how to create <strong>RDML</strong> object from user provided data and calculate Cq values with custom <strong>RDML</strong> class method. Our aim is to a real-world example for the use of the <strong>RDML</strong> package.</p>
+<p>For this purpose we used data from the <em>VideoScan</em> platform. The <em>VideoScan</em> platform is a highly versatile fluorescence microscope based imaging platform for the real-time analysis of biomolecular interactions. <em>VideoScan</em> has been extended by a heating/cooling-unit, which can be used for DNA melting curve analysis <span class="citation">[@roediger_RJ_2013]</span>, real-time quantitative PCR <span class="citation">[@roediger_highly_2013]</span> and quantitative isothermal amplification <span class="citation">[@spiess_impact_2014]</span>. In this example we focus on qPCR data obtained from the amplification of the human gene <em>mlc-2v</em> <span class="citation">[@sheikh_2015]</span>. The experimental details (e.g., primer sequences, amplification conditions) are described in <span class="citation">[@roediger_highly_2013; @george_development_2016]</span>.</p>
+<p>In detail, this dataset contains three amplification curves collected by three runs monitored with TaqMan qPCR chemistry. Similar to other experimental platforms has the <em>VideoScan</em> systems an output as <em>csv</em> file (comma separated value). In general, <em>csv</em> is format that is sufficient for in house usage. However, the exchange with other scientists is demanding.</p>
+<p>After completion of the experiment all <em>csv</em> raw data were transferred to the <strong>R</strong> environment and stored as <em>rda</em> files in the <strong>C54</strong> dataset as described elsewhere <span class="citation">[@RDCT2010c]</span>. The <strong>R</strong> environment provides numerous packages for the import of standard file formats, including formats from spread sheet applications (e.g., <em>XLS</em>, <em>XLSX</em>, <em>ODS</em>) <span class="citation">[@Schutten_2014_ods, @Warnes_2015_gdata, @dragulescu_xlsx_2014]</span>, an ODBC connection <span class="citation">[@ripley_rodbc_2015]</span> or from the clipboard (<code>read.table(&quot;clipboard&quot;)</code>). There are several graphical user interfaces (GUIs) for <strong>R</strong>, which facilitate an easy import of raw data <span class="citation">[@Valero_2012]</span>. For example <strong>RKWard</strong> <span class="citation">[@roediger_rkward_2012]</span> has import functionality for <em>csv</em>, <em>txt</em>, <em>spss</em> and <em>stata</em> files.</p>
+<p>Therefore, we will use the <strong>C54</strong> dataset directly from the <a href="https://CRAN.R-project.org/package=chipPCR">chipPCR</a> package <span class="citation">[@roediger2015chippcr]</span>. The amplification curves have different number of cycles and one of them contains a missing value due to a sensor dropout. Thus, this data should be preprocessed before Cq calculation.</p>
+<div id="initialization" class="section level2">
+<h2>Initialization</h2>
+<p>First of all we have to load all necessary packages and fluorescence data into our <strong>R</strong> session.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">library</span>(RDML)
+<span class="kw">library</span>(chipPCR)
+<span class="kw">library</span>(MBmca)
+<span class="co">#&gt; Warning: package 'robustbase' was built under R version 3.3.1</span>
+<span class="kw">library</span>(ggplot2)
+<span class="kw">data</span>(C54)</code></pre></div>
+<p>We can see that our data is data.frame with cycle numbers in the first column and fluorescence points in other columns. Such format is ready to use with <strong>RDML</strong> package and does not need any conversion.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">str</span>(C54)
+<span class="co">#&gt; 'data.frame':    56 obs. of  4 variables:</span>
+<span class="co">#&gt;  $ Cycle: num  0 1 2 3 4 5 6 7 8 9 ...</span>
+<span class="co">#&gt;  $ D1   : num  0.141 0.146 0.152 0.151 0.153 ...</span>
+<span class="co">#&gt;  $ D2   : num  0.148 0.148 0.148 0.149 0.149 ...</span>
+<span class="co">#&gt;  $ D3   : num  0.145 0.147 0.148 0.148 0.149 ...</span></code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">
+dat &lt;-<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">Cycle =</span> <span class="kw">rep</span>(C54[, <span class="dv">1</span>], <span class="kw">ncol</span>(C54) -<span class="st"> </span><span class="dv">1</span>),
+                  <span class="dt">Experiment =</span> <span class="kw">unlist</span>(<span class="kw">lapply</span>(<span class="kw">colnames</span>(C54)[-<span class="dv">1</span>], function(i) <span class="kw">rep</span>(i, <span class="kw">nrow</span>(C54)))),
+                  <span class="dt">refMFi =</span> <span class="kw">unlist</span>(C54[, -<span class="dv">1</span>]))
+<span class="kw">levels</span>(dat[[<span class="st">&quot;Experiment&quot;</span>]]) &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="st">&quot;D1 - Stock cDNA&quot;</span>, <span class="st">&quot;D2 - 1/10 cDNA&quot;</span>, <span class="st">&quot;D3 - 1/100 cDNA&quot;</span>)
+
+<span class="kw">ggplot</span>(dat, <span class="kw">aes</span>(<span class="dt">x =</span> Cycle, <span class="dt">y =</span> refMFi, <span class="dt">colour =</span> Experiment)) +<span class="st"> </span><span class="kw">geom_point</span>()</code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+</div>
+<div id="creating-custom-method-for-rdml-class" class="section level2">
+<h2>Creating custom method for <strong>RDML</strong> class</h2>
+<p>Preprocessing and Cq calculation steps will be held inside <strong>RDML</strong> object. To do this we shall add custom method to <strong>RDML</strong> class and use this advanced class as <strong>RDML</strong> object initializator (data import).</p>
+<p>As described previously <span class="citation">[@roediger2015r]</span>, we first preprocess the raw data with the <strong>CPP</strong> function from the <a href="https://CRAN.R-project.org/package=chipPCR">chipPCR</a> package. After that preprocessed data will be stored in new runs inside same experiment. For Cq calculation we used the <strong>diffQ2</strong> function from the <a href="https://CRAN.R-project.org/package=MBmca">MBmca</a> <span class="citation">[@roediger_RJ_2013]</span> package.</p>
+<p>Additional our method will have two arguments:</p>
+<ul>
+<li>vector <code>last.cycle</code> – cycle limits for every amplification curve;</li>
+<li>list <code>bg.range</code> – background range for every amplification curve.</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">RDML$<span class="kw">set</span>(<span class="st">&quot;public&quot;</span>, <span class="st">&quot;ProcessVideoScan&quot;</span>,
+         function(last.cycle,
+                  bg.range) {
+           <span class="co"># Get curves description</span>
+           tab &lt;-<span class="st"> </span><span class="kw">as.data.frame</span>(self$<span class="kw">AsTable</span>())
+           <span class="co"># Get fluorescent point</span>
+           dat &lt;-<span class="st"> </span><span class="kw">as.data.frame</span>(self$<span class="kw">GetFData</span>(tab))
+           <span class="co"># Give new names to runs</span>
+           <span class="co"># Preprocess amplification curve raw data as described in </span>
+           <span class="co"># R&amp;ouml;diger et al. (2015) Bioinformatics. Note that the dataset</span>
+           <span class="co"># has different length of cycle numbers and missing values (NAs).</span>
+           <span class="co"># The CPP function from the chipPCR package prepares the data for </span>
+           <span class="co"># further analysis.</span>
+           tab[, <span class="st">&quot;run.id&quot;</span>] &lt;-<span class="st"> </span><span class="kw">paste0</span>(tab[, <span class="st">&quot;run.id&quot;</span>], <span class="st">&quot;_CPP&quot;</span>)
+           
+           <span class="co"># Curves will be used one by one</span>
+           for(i in <span class="dv">2</span>:<span class="kw">length</span>(dat)) {
+             <span class="co"># Preprocess data</span>
+             preprocessed &lt;-<span class="st"> </span><span class="kw">CPP</span>(dat[<span class="dv">1</span>:last.cycle[i -<span class="st"> </span><span class="dv">1</span>], <span class="dv">1</span>], 
+                                 dat[<span class="dv">1</span>:last.cycle[i -<span class="st"> </span><span class="dv">1</span>], i],
+                                 <span class="dt">trans =</span> <span class="ot">TRUE</span>,
+                                 <span class="dt">bg.range =</span> bg.range[[i -<span class="st"> </span><span class="dv">1</span>]])[[<span class="st">&quot;y.norm&quot;</span>]]
+             <span class="co"># Create data.frame with cycle number and preprocessed curve Then</span>
+             <span class="co"># give name to fluorescence points columns as before preprocessing</span>
+             dat_CPP &lt;-<span class="st"> </span><span class="kw">cbind</span>(dat[<span class="dv">1</span>:last.cycle[i -<span class="st"> </span><span class="dv">1</span>], <span class="dv">1</span>],
+                              preprocessed)
+             <span class="kw">colnames</span>(dat_CPP)[<span class="dv">2</span>] &lt;-<span class="st"> </span>tab$fdata.name[i -<span class="st"> </span><span class="dv">1</span>]
+             <span class="co"># Set preprocessed data with new description (new run names)</span>
+             self$<span class="kw">SetFData</span>(dat_CPP, tab)
+             <span class="co"># Calculate and set Cq</span>
+             <span class="co"># Set Cq from second derivative maximum method as described in </span>
+             <span class="co"># R&amp;ouml;diger et al. (2015) Bioinformatics for preprocessed data.</span>
+             <span class="co"># The diffQ2 function from the MBmca package </span>
+             <span class="co"># (R&amp;ouml;diger et al. (2013), The R Journal) was used to calculate the</span>
+             <span class="co"># Cq values of each amplificaion curve.</span>
+             cq &lt;-<span class="st"> </span><span class="kw">diffQ2</span>(dat_CPP, <span class="dt">inder =</span> <span class="ot">TRUE</span>)[[<span class="st">&quot;xTm1.2.D2&quot;</span>]][<span class="dv">1</span>]
+             self$experiment[[tab[i -<span class="st"> </span><span class="dv">1</span>, <span class="st">&quot;exp.id&quot;</span>]]]$
+<span class="st">               </span>run[[tab[i -<span class="st"> </span><span class="dv">1</span>, <span class="st">&quot;run.id&quot;</span>]]]$
+<span class="st">               </span>react[[tab[i -<span class="st"> </span><span class="dv">1</span>, <span class="st">&quot;react.id&quot;</span>]]]$
+<span class="st">               </span>data[[tab[i -<span class="st"> </span><span class="dv">1</span>, <span class="st">&quot;target&quot;</span>]]]$cq &lt;-<span class="st"> </span>cq
+           }
+         }, <span class="dt">overwrite =</span> <span class="ot">TRUE</span>
+)</code></pre></div>
+</div>
+<div id="rdml-object-creation" class="section level2">
+<h2><strong>RDML</strong> object creation</h2>
+<p>Now we can create empty <strong>RDML</strong> with our advanced class and set fluorescence data into it. But for setting data we have to create description (metadata) of curves which will contain:</p>
+<ul>
+<li><code>fdata.name</code> – curve name. Have to be as columns names in data.frame with fluorescence data.</li>
+<li><code>exp.id</code> – experiment name.</li>
+<li><code>run.id</code> – run name. In our case we have three runs.</li>
+<li><code>react.id</code> – react ID. E.g., number of tube inside reaction plate.</li>
+<li><code>sample</code> – sample name.</li>
+<li><code>type</code> – sample type.</li>
+<li><code>target</code> – target name. E.g., gene of interest name.</li>
+<li><code>target.dyeID</code> – fluorescent dye used for detection.</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Create a data frame of metadata </span>
+description &lt;-<span class="st"> </span><span class="kw">data.frame</span>(
+  <span class="dt">fdata.name =</span> <span class="kw">c</span>(<span class="st">&quot;D1&quot;</span>, <span class="st">&quot;D2&quot;</span>, <span class="st">&quot;D3&quot;</span>),
+  <span class="dt">exp.id =</span> <span class="kw">c</span>(<span class="st">&quot;exp1&quot;</span>, <span class="st">&quot;exp1&quot;</span>, <span class="st">&quot;exp1&quot;</span>),
+  <span class="dt">run.id =</span> <span class="kw">c</span>(<span class="st">&quot;run1&quot;</span>, <span class="st">&quot;run2&quot;</span>, <span class="st">&quot;run3&quot;</span>),
+  <span class="dt">react.id =</span> <span class="kw">c</span>(<span class="dv">1</span>, <span class="dv">1</span>, <span class="dv">1</span>),
+  <span class="dt">sample =</span> <span class="kw">c</span>(<span class="st">&quot;D1 - Stock cDNA&quot;</span>, <span class="st">&quot;D2 - 1/10 cDNA&quot;</span>, <span class="st">&quot;D3 - 1/100 cDNA&quot;</span>),
+  <span class="dt">sample.type =</span> <span class="kw">c</span>(<span class="st">&quot;unkn&quot;</span>, <span class="st">&quot;unkn&quot;</span>, <span class="st">&quot;unkn&quot;</span>),
+  <span class="dt">target =</span> <span class="kw">c</span>(<span class="st">&quot;MLC-2v&quot;</span>, <span class="st">&quot;MLC-2v&quot;</span>, <span class="st">&quot;MLC-2v&quot;</span>),
+  <span class="dt">target.dyeId =</span> <span class="kw">c</span>(<span class="st">&quot;Cy5&quot;</span>, <span class="st">&quot;Cy5&quot;</span>, <span class="st">&quot;Cy5&quot;</span>),
+  <span class="dt">stringsAsFactors =</span> <span class="ot">FALSE</span>
+)
+
+<span class="co"># Create an empty RDML object</span>
+video.scan &lt;-<span class="st"> </span>RDML$<span class="kw">new</span>()
+
+<span class="co"># Add fluorescence data and metadata to the RDML object from a given source</span>
+<span class="co"># Fare the sake of easyness we use the C54 dataset from the chipPCR package.</span>
+video.scan$<span class="kw">SetFData</span>(C54, description)</code></pre></div>
+</div>
+<div id="setting-additional-information" class="section level2">
+<h2>Setting additional information</h2>
+<p>As optional step we can add some information about our experiment. Such as experimenter contacts, references to documentation, description of samples and targets, thermal cycling conditions, etc.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Add experimentator information</span>
+video.scan$experimenter &lt;-<span class="st"> </span>
+<span class="st">  </span><span class="kw">list</span>(
+    experimenterType$<span class="kw">new</span>(
+      idType$<span class="kw">new</span>(<span class="st">&quot;SR&quot;</span>),
+      <span class="st">&quot;Stefan&quot;</span>,
+      <span class="st">&quot;Roediger&quot;</span>,
+      <span class="st">&quot;stefan.roediger@b-tu.de&quot;</span>
+    ),
+    experimenterType$<span class="kw">new</span>(
+      idType$<span class="kw">new</span>(<span class="st">&quot;CD&quot;</span>),
+      <span class="st">&quot;Claudia&quot;</span>,
+      <span class="st">&quot;Deutschmann&quot;</span>
+    )
+  )
+
+<span class="co"># Add a reference to documentation</span>
+video.scan$documentation &lt;-<span class="st"> </span><span class="kw">list</span>(
+  documentationType$<span class="kw">new</span>(
+    idType$<span class="kw">new</span>(<span class="st">&quot;Roediger et al. 2013&quot;</span>),
+    <span class="kw">paste</span>(<span class="st">&quot;A Highly Versatile Microscope Imaging Technology Platform for the Multiplex&quot;</span>,
+          <span class="st">&quot;Real-Time Detection of Biomolecules and Autoimmune Antibodies. S. Roediger,&quot;</span>,
+          <span class="st">&quot;P. Schierack, A. Boehm, J. Nitschke, I. Berger, U. Froemmel, C. Schmidt, M.&quot;</span>,
+          <span class="st">&quot;Ruhland, I. Schimke, D. Roggenbuck, W. Lehmann and C. Schroeder. Advances in&quot;</span>,
+          <span class="st">&quot;Biochemical Bioengineering/Biotechnology. 133:33-74, 2013.&quot;</span>,
+          <span class="st">&quot;https://www.ncbi.nlm.nih.gov/pubmed/22437246&quot;</span>)
+  )
+)
+
+cdna &lt;-<span class="st"> </span>
+<span class="st">  </span>cdnaSynthesisMethodType$<span class="kw">new</span>(
+    <span class="dt">enzyme =</span> <span class="st">&quot;SuperScript II&quot;</span>,
+    <span class="dt">primingMethod =</span>
+      primingMethodType$<span class="kw">new</span>(<span class="st">&quot;oligo-dt&quot;</span>),
+    <span class="dt">dnaseTreatment =</span> <span class="ot">TRUE</span>
+  )
+video.scan$sample$<span class="st">`</span><span class="dt">D1 - Stock cDNA</span><span class="st">`</span>$description &lt;-<span class="st"> &quot;Input stock cDNA was used undiluted (D1)&quot;</span>
+video.scan$sample$<span class="st">`</span><span class="dt">D1 - Stock cDNA</span><span class="st">`</span>$cdnaSynthesisMethod &lt;-<span class="st"> </span>cdna
+video.scan$sample$<span class="st">`</span><span class="dt">D2 - 1/10 cDNA</span><span class="st">`</span>$description &lt;-<span class="st"> &quot;1/1000 diluted in A. bidest&quot;</span>
+video.scan$sample$<span class="st">`</span><span class="dt">D2 - 1/10 cDNA</span><span class="st">`</span>$cdnaSynthesisMethod &lt;-<span class="st"> </span>cdna
+video.scan$sample$<span class="st">`</span><span class="dt">D3 - 1/100 cDNA</span><span class="st">`</span>$description &lt;-<span class="st"> &quot;1/1000000 diluted in A. bidest&quot;</span>
+video.scan$sample$<span class="st">`</span><span class="dt">D3 - 1/100 cDNA</span><span class="st">`</span>$cdnaSynthesisMethod &lt;-<span class="st"> </span>cdna
+
+video.scan$target$<span class="st">`</span><span class="dt">MLC-2v</span><span class="st">`</span>$xRef &lt;-<span class="st"> </span><span class="kw">list</span>(
+  xRefType$<span class="kw">new</span>(<span class="st">&quot;uniprot&quot;</span>,
+               <span class="st">&quot;P10916&quot;</span>)
+)
+video.scan$target$<span class="st">`</span><span class="dt">MLC-2v</span><span class="st">`</span>$sequences &lt;-<span class="st"> </span>
+<span class="st">  </span>sequencesType$<span class="kw">new</span>(
+    forwardPrimer &lt;-<span class="st"> </span>oligoType$<span class="kw">new</span>(
+      <span class="dt">sequence =</span> <span class="st">&quot;ACAGGGATGGCTTCATTGAC&quot;</span>),
+    reversePrimer &lt;-<span class="st"> </span>oligoType$<span class="kw">new</span>(
+      <span class="dt">sequence =</span> <span class="st">&quot;ATGCGTTGAGAATGGTTTCC&quot;</span>),
+    probe1 &lt;-<span class="st"> </span>oligoType$<span class="kw">new</span>(
+      <span class="dt">threePrimeTag =</span> <span class="st">&quot;Atto647N&quot;</span>,
+      <span class="dt">sequence =</span> <span class="st">&quot;CAGGGTCCGCTCCCTTAAGTTTCTCC&quot;</span>,
+      <span class="dt">fivePrimeTag =</span> <span class="st">&quot;BHQ2&quot;</span>)
+  )
+
+tcc &lt;-<span class="st"> </span>
+<span class="st">  </span>thermalCyclingConditionsType$<span class="kw">new</span>(
+    idType$<span class="kw">new</span>(<span class="st">&quot;Amplification&quot;</span>),
+    <span class="dt">experimenter =</span> <span class="kw">list</span>(
+      idReferencesType$<span class="kw">new</span>(<span class="st">&quot;SR&quot;</span>),
+      idReferencesType$<span class="kw">new</span>(<span class="st">&quot;CD&quot;</span>)
+    ),
+    <span class="dt">step =</span> 
+      <span class="kw">list</span>(
+        stepType$<span class="kw">new</span>(
+          <span class="dt">nr =</span> <span class="dv">1</span>,
+          <span class="dt">temperature =</span> temperatureType$<span class="kw">new</span>(<span class="dv">95</span>,
+                                            <span class="dv">600</span>)
+        ),
+        stepType$<span class="kw">new</span>(
+          <span class="dt">nr =</span> <span class="dv">2</span>,
+          <span class="dt">temperature =</span> temperatureType$<span class="kw">new</span>(<span class="dv">95</span>,
+                                            <span class="dv">40</span>)
+        ),
+        stepType$<span class="kw">new</span>(
+          <span class="dt">nr =</span> <span class="dv">3</span>,
+          <span class="dt">temperature =</span> temperatureType$<span class="kw">new</span>(<span class="fl">58.5</span>,
+                                            <span class="dv">90</span>)
+        ),
+        stepType$<span class="kw">new</span>(
+          <span class="dt">nr =</span> <span class="dv">4</span>,
+          <span class="dt">temperature =</span> temperatureType$<span class="kw">new</span>(<span class="fl">68.5</span>,
+                                            <span class="dv">90</span>)
+        ),
+        stepType$<span class="kw">new</span>(
+          <span class="dt">nr =</span> <span class="dv">5</span>,
+          <span class="dt">loop =</span> loopType$<span class="kw">new</span>(<span class="dt">goto =</span> <span class="dv">2</span>,
+                              <span class="dt">repeat.n =</span> <span class="dv">49</span>)
+        )
+      )
+  )
+video.scan$thermalCyclingConditions &lt;-<span class="st"> </span><span class="kw">list</span>(
+  tcc
+)
+
+<span class="co">#add description of the experiment</span>
+video.scan$experiment$exp1$description &lt;-<span class="st"> </span>
+<span class="st">  </span><span class="kw">paste</span>(<span class="st">&quot;The aim was to amplify MLC-2v in the VideoScan and to monitor with a&quot;</span>,
+        <span class="st">&quot;hydrolysis probe for MLC-2v. The primer sequences for MLC-2v were taken&quot;</span>,
+        <span class="st">&quot;from Roediger et al. (2013). The amplification was detected in solution of&quot;</span>,
+        <span class="st">&quot;the 1 HCU (see Roediger et al. 2013 for details). A 20 micro L PCR reaction&quot;</span>,
+        <span class="st">&quot;was composed of 250 nM primer (forward and reverse), 1x Maxima Probe qPCR&quot;</span>,
+        <span class="st">&quot;Master Mix (Fermentas), 1 micro L template (MLC-2v amplification product in&quot;</span>,
+        <span class="st">&quot;different dilutions), 50 nM hydrolysis probe probe for MLC-2v and A.&quot;</span>,
+        <span class="st">&quot;bidest. During the amplification, fluorescence was measured at 59.5 degree&quot;</span>,
+        <span class="st">&quot;Celsius. The Cy5 channel was used to monitor the MLC-2v specific hydrolysis&quot;</span>,
+        <span class="st">&quot;probe. Input stock cDNA was used undiluted (D1). D2 was 1/1000 and D3&quot;</span>,
+        <span class="st">&quot;1/1000000 diluted in A. bidest. The D1, D2, and D3 have different numbers&quot;</span>,
+        <span class="st">&quot;measure points and D2 contains a missing value at cycle 37.&quot;</span>)
+video.scan$experiment$exp1$run$run1$thermalCyclingConditions &lt;-<span class="st"> </span>idReferencesType$<span class="kw">new</span>(<span class="st">&quot;Amplification&quot;</span>)
+video.scan$experiment$exp1$run$run2$thermalCyclingConditions &lt;-<span class="st"> </span>idReferencesType$<span class="kw">new</span>(<span class="st">&quot;Amplification&quot;</span>)
+video.scan$experiment$exp1$run$run3$thermalCyclingConditions &lt;-<span class="st"> </span>idReferencesType$<span class="kw">new</span>(<span class="st">&quot;Amplification&quot;</span>)</code></pre></div>
+</div>
+<div id="processing-data" class="section level2">
+<h2>Processing data</h2>
+<p>After creating <strong>RDML</strong> object and setting data we can use our method <code>$ProcessVideoScan</code>.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Process VideoScan data</span>
+video.scan$<span class="kw">ProcessVideoScan</span>(<span class="dt">last.cycle =</span> <span class="kw">c</span>(<span class="dv">35</span>, <span class="dv">45</span>, <span class="dv">55</span>),
+                            <span class="dt">bg.range =</span> <span class="kw">list</span>(<span class="kw">c</span>(<span class="dv">1</span>,<span class="dv">8</span>),
+                                           <span class="ot">NULL</span>,
+                                           <span class="ot">NULL</span>))</code></pre></div>
+<p>Then visualize object with <code>$AsDendrogram</code> method (runs with IDs that include <code>_CPP</code> in names contain preprocessed curves):</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Visualise RDML object</span>
+video.scan$<span class="kw">AsDendrogram</span>()</code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>And plot preprocessed curves indicating Cq values:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">## Visualise preprocessed data with Cq values as vertical dashed lines
+<span class="co"># Add custom column that contains calculated Cq</span>
+tab &lt;-<span class="st"> </span>video.scan$<span class="kw">AsTable</span>(<span class="dt">cq =</span> {
+                 cq &lt;-<span class="st"> </span>data$cq
+                 if (<span class="kw">is.null</span>(cq) ||<span class="st"> </span><span class="kw">is.na</span>(cq))
+                   <span class="ot">NULL</span>
+                 else
+                   cq
+               })
+<span class="co"># Get preprocessed data in 'long.table' format</span>
+dat &lt;-<span class="st"> </span>video.scan$<span class="kw">GetFData</span>(tab[<span class="kw">grepl</span>(<span class="st">&quot;_CPP&quot;</span>, tab[[<span class="st">&quot;run.id&quot;</span>]]), ],
+                           <span class="dt">long.table =</span> <span class="ot">TRUE</span>)
+<span class="kw">ggplot</span>(dat, <span class="kw">aes</span>(<span class="dt">x =</span> cyc, <span class="dt">y =</span> fluor)) +
+<span class="st">  </span><span class="kw">geom_line</span>(<span class="kw">aes</span>(<span class="dt">group =</span> fdata.name, <span class="dt">color =</span> fdata.name),
+            <span class="dt">size =</span> <span class="fl">1.2</span>) +
+<span class="st">  </span><span class="kw">geom_vline</span>(<span class="kw">aes</span>(<span class="dt">xintercept =</span> cq, <span class="dt">color =</span> fdata.name),
+             <span class="dt">linetype =</span> <span class="st">&quot;longdash&quot;</span>) +
+<span class="st">  </span><span class="kw">scale_x_continuous</span>(<span class="st">&quot;Cycle&quot;</span>) +
+<span class="st">  </span><span class="kw">scale_y_continuous</span>(<span class="st">&quot;Fluorescence&quot;</span>) +
+<span class="st">  </span><span class="kw">ggtitle</span>(<span class="st">&quot;Amplification of human MLC-2v</span><span class="ch">\n</span><span class="st">VideoScan HCU&quot;</span>)</code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+</div>
+<div id="export-to-file" class="section level2">
+<h2>Export to file</h2>
+<p>To save our <strong>RDML</strong> object as file we can use <code>$AsXML()</code> method with file name as argument:</p>
+<p><code>video.scan$AsXML(&quot;filename.RDML&quot;)</code></p>
+<p><em>Note that currently due to limits of <code>XML</code> package it is rather slow operation!!!</em></p>
+<p>XML files can be compressed to save sapce. The <strong>RMDL</strong> package uses the <code>zip()</code> function from the <strong>utils</strong> package with default values to compress the RDML file. Therefore, the compression mode depends on the operating system. The <strong>RDML</strong> function <code>AsXML()</code> without an argument returns one string, which contians the XML data. This can be used to compress it with any other compression algorithm.</p>
+</div>
+<div id="benchmark-of-the-rdml-generation" class="section level2">
+<h2>Benchmark of the RDML generation</h2>
+<p>XML becomes less efficient to work with at larger file sizes and complexer structured information (e.g., matrices). Therefore, a limitation of RMDL is the process of file generation. This characteristic is inherited by the <strong>RDML</strong> package. Speed is an issue in high-throughput applications. To give the user a foundation for a decision if the implementation of the RMDL format is advisable we performed a benchmark. We used the <strong>microbenchmark</strong> package <span class="citation">[@Mersmann_2014_microbenchmark, @Radford_2014_microbenchmark]</span> to assess the time required for generation of RDML files. The simulation included datasets with ranging from 1 to 1000 entries per file.</p>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>In this example we used raw data from the <em>VideoScan</em> platform to demonstrate the creation of an <em>RDML</em> file via the <strong>RDML</strong> package. This procedure can be easily adapted to other experiments and gives the researcher a tool to create a data file for convenient data exchange. In contrast to simple <em>csv</em> files contains this file metadata in a defined structure. This in turn makes the data available to other scientists for reproducible research.</p>
+</div>
+</div>
+
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -3,10 +3,10 @@
 #' Sets fluorescence data vectors to \code{RDML} object for specified method
 #' of experiment.
 #' 
-#' @param data \code{matrix} that contains in the first column constant data for all fluorescence vectors (i.e. cycle numbers or temperature)
-#' and fluorescence values in the following columns. The column name is the name of constant data.
-#' Names of other column are \code{fdata.names} (links to rows at \code{description}). Name of
-#' matrix passed to param becomes type of data.
+#' @param data \code{matrix} containing in the first column data corresponding to 
+#' all fluorescence values in the following columns. The name of the first column 
+#' is the name of variable and names of other column are \code{fdata.names} (links 
+#' to rows at \code{description}).
 #' @param description output from \code{AsTable} function that describes fluorescence data.
 #' @param fdata.type 'adp' for qPCR, 'mdp' for melting data.
 #' 
@@ -53,109 +53,131 @@ RDML$set("public", "SetFData",
            #            first.col.name <- ifelse(fdata.type == "adp",
            #                                     "cyc",
            #                                     "tmp")
+           fdata <- data.table(fdata)
+           names(fdata)[1] <- "cyc"
+           
+           description <- data.table(description)
+           
            fdata.names <- colnames(fdata)[2:ncol(fdata)]
            
-           for(fdata.n in fdata.names) {
-             descr.row <- description[description$fdata.name == fdata.n, ] %>% 
-               unlist
+           for (fdata.n in fdata.names) {
+             descr.row <- description[fdata.name == fdata.n]
+             if (nrow(descr.row) == 0) {
+               warning(paste("No such decription:", fdata.n))
+               next
+             }
+             if (nrow(descr.row) > 1) {
+               stop(paste("Multiply decription:", fdata.n))
+             }
              # adds unavailable subelements
-             if (private$.experiment[[descr.row["exp.id"]]]$
-                 run[[descr.row["run.id"]]]$
-                 react[[descr.row["react.id"]]]$
-                 data[[descr.row["target"]]] %>% is.null) {
-               if (private$.experiment[[descr.row["exp.id"]]] %>% 
-                   is.null) {
+             if (private$.experiment[[descr.row[, exp.id]]]$
+                 run[[descr.row[, run.id]]]$
+                 react[[as.character(descr.row[, react.id])]]$
+                 data[[descr.row[, target]]] %>>% is.null()) {
+               if (private$.experiment[[descr.row[, exp.id]]] %>>% 
+                   is.null()) {
                  self$experiment <- 
-                   c(self$experiment,
-                     experimentType$new(idType$new(descr.row["exp.id"])))
+                   c(private$.experiment,
+                     experimentType$new(idType$new(descr.row[, exp.id])))
                }
-               if (private$.experiment[[descr.row["exp.id"]]]$
-                   run[[descr.row["run.id"]]] %>% 
-                   is.null) {
-                 private$.experiment[[descr.row["exp.id"]]]$run <- 
-                   c(private$.experiment[[descr.row["exp.id"]]]$run,
+               if (private$.experiment[[descr.row[, exp.id]]]$
+                   run[[descr.row[, run.id]]] %>>% 
+                   is.null()) {
+                 private$.experiment[[descr.row[, exp.id]]]$run <- 
+                   c(private$.experiment[[descr.row[, exp.id]]]$run,
                      runType$new(
-                       idType$new(descr.row["run.id"]),
+                       idType$new(descr.row[, run.id]),
                        pcrFormat = 
                          pcrFormatType$new(8, 12,
                                            labelFormatType$new("ABC"),
                                            labelFormatType$new("123"))))
                }
-               if (private$.experiment[[descr.row["exp.id"]]]$
-                   run[[descr.row["run.id"]]]$
-                   react[[descr.row["react.id"]]] %>% 
-                   is.null) {
-                 private$.experiment[[descr.row["exp.id"]]]$
-                   run[[descr.row["run.id"]]]$react <- 
-                   c(private$.experiment[[descr.row["exp.id"]]]$
-                       run[[descr.row["run.id"]]]$react,
+               if (private$.experiment[[descr.row[, exp.id]]]$
+                   run[[descr.row[, run.id]]]$
+                   react[[as.character(descr.row[, react.id])]] %>>% 
+                   is.null()) {
+                 private$.experiment[[descr.row[, exp.id]]]$
+                   run[[descr.row[, run.id]]]$react <- 
+                   c(private$.experiment[[descr.row[, exp.id]]]$
+                       run[[descr.row[, run.id]]]$react,
                      reactType$new(
-                       reactIdType$new(descr.row["react.id"] %>% as.integer),
-                       sample = idReferencesType$new(descr.row["sample"])))
-                 if (private$.experiment[[descr.row["sample"]]] %>% 
-                     is.null) {
+                       reactIdType$new(descr.row[, react.id]),
+                       sample = idReferencesType$new(descr.row[, sample])))
+                 if (private$.sample[[descr.row[, sample]]] %>>% 
+                     is.null()) {
                    self$sample <- c(
                      self$sample,
-                     sampleType$new(idType$new(descr.row["sample"]))
+                     sampleType$new(idType$new(descr.row[, sample]),
+                                    type = sampleTypeType$new(descr.row[, sample.type]))
+                     
                    )
                  }
                }
-               if (private$.experiment[[descr.row["exp.id"]]]$
-                   run[[descr.row["run.id"]]]$
-                   react[[descr.row["react.id"]]]$
-                   data[[descr.row["target"]]] %>% 
-                   is.null) {
-                 private$.experiment[[descr.row["exp.id"]]]$
-                   run[[descr.row["run.id"]]]$
-                   react[[descr.row["react.id"]]]$
+               
+               if (private$.experiment[[descr.row[, exp.id]]]$
+                   run[[descr.row[, run.id]]]$
+                   react[[as.character(descr.row[, react.id])]]$
+                   data[[descr.row[, target]]] %>>% 
+                   is.null()) {
+                 private$.experiment[[descr.row[, exp.id]]]$
+                   run[[descr.row[, run.id]]]$
+                   react[[as.character(descr.row[, react.id])]]$
                    data <- 
-                   c(private$.experiment[[descr.row["exp.id"]]]$
-                       run[[descr.row["run.id"]]]$
-                       react[[descr.row["react.id"]]]$
+                   c(private$.experiment[[descr.row[, exp.id]]]$
+                       run[[descr.row[, run.id]]]$
+                       react[[as.character(descr.row[, react.id])]]$
                        data,
                      dataType$new(idReferencesType$new(
-                         descr.row["target"])
-                       ))
-                 if (private$.target[[descr.row["target"]]] %>% 
-                     is.null) {
+                       descr.row[, target])
+                     ))
+                 if (private$.target[[descr.row[, target]]] %>>% 
+                     is.null()) {
                    self$target <- c(
                      self$target,
-                     targetType$new(idType$new(descr.row["target"]),
+                     targetType$new(idType$new(descr.row[, target]),
                                     type = targetTypeType$new("toi"),
                                     dyeId = idReferencesType$new(
-                                      descr.row["target.dyeId"]
+                                      descr.row[, target.dyeId]
                                     ))
                    )
                  }
-                 if (private$.dye[[descr.row["target.dyeId"]]] %>% 
-                     is.null) {
+                 if (private$.dye[[descr.row[, target.dyeId]]] %>>% 
+                     is.null()) {
                    self$dye <- c(
                      self$dye,
-                     dyeType$new(idType$new(descr.row["target.dyeId"]))
+                     dyeType$new(idType$new(descr.row[, target.dyeId]))
                    )
                  }
                }
              }
-             private$.experiment[[descr.row["exp.id"]]]$
-               run[[descr.row["run.id"]]]$
-               react[[descr.row["react.id"]]]$
-               data[[descr.row["target"]]][[fdata.type]] <- {
-                 if(fdata.type == "adp") {
+             private$.experiment[[descr.row[, exp.id]]]$
+               run[[descr.row[, run.id]]]$
+               react[[as.character(descr.row[, react.id])]]$
+               data[[descr.row[, target]]][[fdata.type]] <- {
+                 if (fdata.type == "adp") {
                    adpsType$new(
-                     matrix(c(fdata[, 1], fdata[, fdata.n]),
-                            byrow = FALSE,
-                            ncol = 2,
-                            dimnames = list(NULL,
-                                            c("cyc", "fluor"))))
+                     data.table(cyc = fdata[, cyc], fluor = fdata[, get(fdata.n)]))
                  } else {
                    mdpsType$new(
-                     matrix(c(fdata[, 1], fdata[, fdata.n]), 
-                            byrow = FALSE,
-                            ncol = 2,
-                            dimnames = list(NULL,
-                                            c("tmp", "fluor"))))
+                     data.table(tmp = fdata[, cyc], fluor = fdata[, get(fdata.n)]))
                  }
                }
            }
+           
+           
+           
+           # add concentrations 
+           if (!is.null(description$quantity)) {
+             for (sample.name in description$sample %>>% unique()) {
+               if (!is.na(description[sample == sample.name, quantity][1])) {
+                 private$.sample[[sample.name]]$quantity <- 
+                   quantityType$new(
+                     value = unname(description[sample == sample.name, quantity][1]),
+                     unit = quantityUnitType$new("other")
+                   )
+               }
+             }
+           }
+           
          }
          , overwrite = TRUE)

@@ -1,3 +1,18 @@
+Changes from Version 0.9-4 to 0.9-5 [December 08 2016]
+* CRAN version
+
+Changes from Version 0.9-3 to 0.9-4 [October 20 2016]
+* vignettes corrected
+
+Changes from Version 0.9-2 to 0.9-3 [July 15 2016]
+* migration to xml2 instead of XML
+* start migration from plyr to rlist
+* AsTable works much faster and returns data.table
+
+Changes from Version 0.9-1 to 0.9-2 [September 09 2015]
+* GUI beta version
+* migration to checkmate instead of assertthat
+
 Changes from Version 0.8-4 to 0.9-1 [July 08 2015]
 * now all RDML types are R6 classes
 

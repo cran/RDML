@@ -1,29 +1,32 @@
 #' R6 class \code{RDML} -- contains methods to read and overview fluorescence 
 #' data from RDML v1.1 and v1.2 format files
 #' 
-#' Main purpose of this class is to work with RDML format data (Lefever et al. 
-#' 2009) and transform it to the appropriate format of the \code{qpcR} (Ritz et 
-#' al. 2008, Spiess et al. 2008) and \code{chipPCR} packages (see 
-#' \link{RDML.new} for import details). 
+#' This class is a container for RDML format data (Lefever et al. 
+#' 2009). The data may be further transformed to the appropriate format of the 
+#' \code{qpcR} (Ritz et al. 2008, Spiess et al. 2008) and \code{chipPCR} 
+#' (Roediger et al. 2015) packages (see \link{RDML.new} for import details). 
 #' Real-time PCR Data Markup Language (RDML) is the recommended file format 
 #' element in the Minimum Information for Publication of Quantitative Real-Time 
-#' PCR Experiments (MIQE) guidelines (Bustin et al. 2009). Inner structure of 
-#' imported data mimics structure of RDML file v1.2. All data except fluorescence values
-#' can be represented as \code{data.frame} by method \code{AsTable}. Such variant of data representation allows easy samples 
-#' filtering (by targets, types, etc.) and serves as request for \code{GetFData}
-#' method -- gets fluorescence data for specified samples.
+#' PCR Experiments (MIQE) guidelines (Bustin et al. 2009). The inner structure of 
+#' imported data faithfully reflects the structure of RDML file v1.2. All data with 
+#' the exception for fluorescence values can be represented as \code{data.frame} by 
+#' method \code{AsTable}. Such possibility of data representation streamlines 
+#' sample filtering (by targets, types, etc.) and serves as request for \code{GetFData}
+#' method, which extracts fluorescence data for specified samples.
 #' 
 #' 
 #' @section Fields: Type, structure of data and description of fields can be 
 #'   viewed at RDML v1.2 file description. Names of fields are first level of 
 #'   XML tree.
-#' @section Methods: \describe{\item{new}{creates new instance of \code{RDML} 
-#'   class object (see \link{RDML.new})} \item{AsTable}{represent RDML data as 
-#'   \code{data.frame} (see \link{RDML.AsTable})}\item{GetFData}{gets
-#'   fluorescence data (see \link{RDML.GetFData})}\item{SetFData}{sets
-#'   fluorescence data (see \link{RDML.SetFData})}\item{Merge}{merges two 
-#'   \code{RDML} to one (see \link{MergeRDMLs})}
-#'   \item{AsDendrogram}{represents structure of \code{RDML} object as dendrogram(see \link{RDML.AsDendrogram})}}
+#' @section Methods: \describe{
+#' \item{new}{creates a new instance of \code{RDML} class object (see \link{RDML.new})} 
+#' \item{AsTable}{represent RDML data as \code{data.frame} (see \link{RDML.AsTable})}
+#' \item{GetFData}{gets fluorescence data (see \link{RDML.GetFData})}
+#' \item{SetFData}{sets fluorescence data (see \link{RDML.SetFData})}
+#' \item{Merge}{merges two \code{RDML} to one (see \link{MergeRDMLs})}
+#' \item{AsDendrogram}{represents structure of \code{RDML} object as dendrogram(see 
+#'   \link{RDML.AsDendrogram})}
+#'  }
 #'   
 #' @author Konstantin A. Blagodatskikh <k.blag@@yandex.ru>, Stefan Roediger 
 #'   <stefan.roediger@@b-tu.de>, Michal Burdukiewicz 
@@ -36,9 +39,14 @@
 #'   \code{chipPCR} package: 
 #'   http://cran.r-project.org/web/packages/chipPCR/index.html
 #'   
+#'   Roediger S, Burdukiewicz M and Schierack P (2015). chipPCR: an R Package 
+#'   to Pre-Process Raw Data of Amplification Curves. \emph{Bioinformatics} first 
+#'   published online April 24, 2015 doi:10.1093/bioinformatics/btv205
+#'   
 #'   Ritz, C., Spiess, A.-N., 2008. qpcR: an R package for sigmoidal model 
 #'   selection in quantitative real-time polymerase chain reaction analysis. 
-#'   \emph{Bioinformatics} 24, 1549--1551. doi:10.1093/bioinformatics/btn227
+#'   \emph{Bioinformatics} 24, 1549--1551. 
+#'   doi:10.1093/bioinformatics/btn227
 #'   
 #'   Spiess, A.-N., Feig, C., Ritz, C., 2008. Highly accurate sigmoidal fitting 
 #'   of real-time PCR data by introducing a parameter for asymmetry. \emph{BMC 
@@ -58,12 +66,8 @@
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-#' @import assertthat rlist
 #' @importFrom R6 R6Class
-#' @importFrom plyr alply llply ldply laply ddply compact .
-#' @importFrom tidyr spread
-#' @import dplyr
-#' @include RDML.asserts.R
+#' @import checkmate data.table rlist pipeR stringr xml2
 #' @include RDML.types.R
 #' @examples 
 #' ## EXAMPLE 1:
@@ -173,7 +177,7 @@ RDML <- R6Class("RDML",
                 inherit = rdmlBaseType,
                 public = list(
                   ###               WARNING
-                  ### Some RDML functions are store at separate files!!!
+                  ### Some RDML functions are stored as separate files!!!
                   ### Empty functions are added to let roxygen work.                  
                   initialize = function() { },                  
                   AsTable = function() { },
@@ -181,26 +185,16 @@ RDML <- R6Class("RDML",
                   SetFData = function() { },
                   AsDendrogram = function() { },
                   AsXML = function(file.name) {
-                    tree <- self$.asXMLnodes("rdml",
-                                             "http://www.rdml.org")
-                    #rdml_data.xml
-                    if(missing(file.name))
+                    tree <- self$.asXMLnodes("rdml") %>>% 
+                      (text ~ 
+                         sub('>', ' xmlns="http://www.rdml.org" version="1.2">', text))
+                    if (missing(file.name))
                       return(tree)
-                    saveXML(tree,
-                            "rdml_data.xml")
+                    cat(tree,
+                        file = "rdml_data.xml")
                     zip(file.name,
                         "rdml_data.xml")
                     unlink("rdml_data.xml")
-                  },
-                  .asXMLnodes = function(node.name,
-                                         namespaceDefinitions = NULL) {
-                    tree <- 
-                      super$.asXMLnodes(node.name,
-                                        namespaceDefinitions)
-                    xmlAttrs(tree) <- c(version = 1.2)
-                    #                     tree$setNamespace("http://www.rdml.org")
-                    tree
-                    # super$.asXMLnodes(node.name)))
                   }
                 ),
                 private = list(
@@ -213,122 +207,95 @@ RDML <- R6Class("RDML",
                   .sample = NULL,
                   .target = NULL,
                   .thermalCyclingConditions = NULL,
-                  .experiment = NULL#,
-                  #                   .recalcPositions = function() {
-                  #                     for(exp.id in names(private$.experiment)) {
-                  #                       for(run.id in names(
-                  #                         private$.experiment[[exp.id]]$run)) {
-                  #                         for(react.id in names(
-                  #                           private$.experiment[[exp.id]]$
-                  #                           run[[run.id]]$react)) {
-                  #                           private$.experiment[[exp.id]]$
-                  #                             run[[run.id]]$
-                  #                             react[[react.id]]$position <- {
-                  #                               id <- as.integer(react.id)
-                  #                               cols <- private$.experiment[[exp.id]]$
-                  #                                 run[[run.id]]$pcrFormat$columns
-                  #                               sprintf("%s%02i",
-                  #                                       LETTERS[(id - 1) %/% cols + 1],
-                  #                                       as.integer((id - 1) %% cols + 1))
-                  #                             }
-                  #                         }
-                  #                       }
-                  #                     }
-                  #                   }
+                  .experiment = NULL
                 ),
                 active = list(
                   dateMade = function(date.made) {
-                    if(missing(date.made))
+                    if (missing(date.made))
                       return(private$.dateMade)
-                    assert_that(is.string(date.made))
+                    assert(checkDateTime(date.made))
                     private$.dateMade <- date.made
                   },
                   
                   dateUpdated = function(date.updated) {
-                    if(missing(date.updated))
-                      return(private$.date.updated)
-                    assert_that(is.string(date.updated))
+                    if (missing(date.updated))
+                      return(private$.dateUpdated)
+                    assert(checkDateTime(date.updated))
                     private$.dateUpdated <- date.updated
                   },
                   
                   id = function(id) {
-                    if(missing(id))
+                    if (missing(id))
                       return(private$.id)                    
-                    assert_that(is.list.type(id,
-                                             rdmlIdType))
-                    private$.id <- id
-#                       with.names(quote(id,
-#                                        .$publisher))
+                    assertList(id, "rdmlIdType")
+                    private$.id <- 
+                      list.names(id,
+                                 .$publisher)
                   },
                   
                   experimenter = function(experimenter) {
-                    if(missing(experimenter))
+                    if (missing(experimenter))
                       return(private$.experimenter)
-                    assert_that(is.list.type(experimenter,
-                                             experimenterType))
+                    assertList(experimenter, "experimenterType")
                     private$.experimenter <- 
-                      with.names(experimenter,
-                                 quote(.$id$id))
+                      list.names(experimenter,
+                                 .$id$id)
                   },
                   
                   documentation = function(documentation) {
-                    if(missing(documentation))
+                    if (missing(documentation))
                       return(private$.documentation)
-                    assert_that(is.list.type(documentation,
-                                             documentationType))                    
+                    assertList(documentation, "documentationType")                    
                     private$.documentation <- 
-                      with.names(documentation,
-                                 quote(.$id$id))
+                      list.names(documentation,
+                                 .$id$id)
                   },
                   
                   dye = function(dye) {
-                    if(missing(dye))
+                    if (missing(dye))
                       return(private$.dye)
-                    assert_that(is.list.type(dye,
-                                             dyeType))
+                    assertList(dye, "dyeType")
                     private$.dye <- 
-                      with.names(dye,
-                                 quote(.$id$id))
+                      list.names(dye,
+                                 .$id$id)
                   },
                   
                   sample = function(sample) {
-                    if(missing(sample))
+                    if (missing(sample))
                       return(private$.sample)
-                    assert_that(is.list.type(sample,
-                                             sampleType))
+                    assertList(sample, "sampleType")
                     private$.sample <- 
-                      with.names(sample,
-                                 quote(.$id$id))
+                      list.names(sample,
+                                 .$id$id)
                   },
                   
                   target = function(target) {
-                    if(missing(target))
+                    if (missing(target))
                       return(private$.target)
-                    assert_that(is.list.type(target,
-                                             targetType))
+                    assertList(target, "targetType")
                     private$.target <- 
-                      with.names(target,
-                                 quote(.$id$id))
+                      list.names(target,
+                                 .$id$id)
                   },
                   
                   thermalCyclingConditions = function(thermalCyclingConditions) {
-                    if(missing(thermalCyclingConditions))
+                    if (missing(thermalCyclingConditions))
                       return(private$.thermalCyclingConditions)
-                    assert_that(is.list.type(thermalCyclingConditions,
-                                             thermalCyclingConditionsType))
+                    assertList(thermalCyclingConditions, "thermalCyclingConditionsType")
                     private$.thermalCyclingConditions <- 
-                      with.names(thermalCyclingConditions,
-                                 quote(.$id$id))
+                      list.names(thermalCyclingConditions,
+                                 .$id$id)
                   },
                   
                   experiment = function(experiment) {
-                    if(missing(experiment))
+                    if (missing(experiment))
                       return(private$.experiment)
-                    assert_that(is.list.type(experiment,
-                                             experimentType))
-                    private$.experiment <- with.names(experiment,
-                                                      quote(.$id$id))
+                    assertList(experiment, "experimentType")
+                    private$.experiment <- list.names(experiment,
+                                                      .$id$id)
                   }
                   
                 )
 )
+
+utils::globalVariables(c("."))

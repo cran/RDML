@@ -1,101 +1,115 @@
-with.names <- function(l, id) {
-  if (is.null(l))
+# rlist::list.names with correct .data=NULL
+list.names <- function(data, ...) {
+  if (is.null(data))
     return(NULL)
-  n <- list.select(l,
-                   eval(id)) %>% 
-    unlist
-  if (is.null(n))
-    return(l)
-  names(l) <- n
-  l
+  rlist::list.names(data, ...)
+}
+
+checkDateTime <- function(dateTime){
+  if (is.null(dateTime))
+    return(TRUE)
+  if(!is.na(ymd_hms(dateTime, quiet = TRUE)) ||
+     !is.na(ymd(dateTime, quiet = TRUE))) {
+    return(TRUE)
+  }
+  return("Must pass lubridate ymd_hms() or ymd() conversion")
 }
 
 # rdmlBaseType ------------------------------------------------------------
 
 #' Base R6 class for RDML package.
-#' 
-#' Most classes of RDML package inherit this class. It can't be directly 
-#' accessed and serves only for inner package usage.
-#' 
-#' @section Initialization: \code{rdmlBaseType$new()}
-#'   
-#' @section Methods: \describe{\item{\code{.asXMLnodes(node.name)}}{Represents
+#'
+#' Most classes from RDML package inherit this class. It is designed for internal
+#' usage and should not be directly accessed.
+#'
+#' @section Initialization: \preformatted{rdmlBaseType$new()}
+#'
+#' @section Methods: \describe{
+#' \item{\code{.asXMLnodes(node.name)}}{Represents
 #'   object as XML nodes. Should not be called directly. \code{node.name} --
 #'   name of the root node for the generated XML
-#'   tree.}\item{\code{print(...)}}{prints object}}
-#'   
+#'   tree.}
+#' \item{\code{print(...)}}{prints object}}
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 rdmlBaseType <-
   R6Class("rdmlBaseType",
           # class = FALSE,
           public = list(
-            .asXMLnodes = function(node.name,
-                                   namespaceDefinitions = NULL) {
-              # has.attrs <- FALSE
-              subnodes <- names(private)
-              newXMLNode(
-                name = node.name,
-                namespaceDefinitions = namespaceDefinitions,
-                attrs = {
-                  get.attrs <- function() {
-                    for(name in subnodes) {
-                      if(class(private[[name]])[1] == "idType" ||
-                         class(private[[name]])[1] == "reactIdType") {
-                        subnodes <<- subnodes[subnodes != name]
-                        # has.attrs <<- TRUE
-                        return(list(id = private[[name]]$id))
-                      }
-                    }
-                    NULL
-                  }
-                  get.attrs()
-                },
-                .children = {
-                  llply(subnodes,
-                        function(name) {
-                          subnode.name <- gsub("^\\.(.*)$",
-                                               "\\1", name)
-                          switch(
-                            typeof(private[[name]]),
-                            closure = NULL,
-                            list = 
-                              llply(private[[name]],
-                                    function(sublist)
-                                      sublist$.asXMLnodes(subnode.name))
-                            ,
-                            environment = {
-                              switch(class(private[[name]])[2],
-                                     enumType = {
-                                       if (is.null(private[[name]]$value) ||
-                                           is.na(private[[name]]$value))
-                                         NULL
-                                       else
-                                         newXMLNode(name = subnode.name,
-                                                    text = private[[name]]$value)
-                                     },
-                                     idType = 
-                                       newXMLNode(name = subnode.name,
-                                                  attrs = 
-                                                    list(id = private[[name]]$id)),
-                                     private[[name]]$.asXMLnodes(subnode.name)
-                              )},
-                            {
-                              if (is.null(private[[name]]) ||
-                                  is.na(private[[name]]))
-                                NULL
-                              else
-                                newXMLNode(name = subnode.name,
-                                           text = private[[name]])
-                            })
-                        }) %>% 
-                    compact
-                }
-              )
+            .asXMLnodes = function(node.name) {
+              subnodes <- names(private)[grepl("^\\..*$",
+                                               names(private))] # %>>% rev()
+              sprintf("<%s%s>%s</%s>",
+                      node.name, #node name
+                      # attribute
+                      {
+                        attrs <- NULL
+                        for (subnode in subnodes) {
+                          if (class(private[[subnode]])[1] == "idType" ||
+                              class(private[[subnode]])[1] == "reactIdType") {
+                            attrs <- c(attrs, subnode)
+                          }
+                        }
+                        if (length(attrs) == 0) {
+                          ""
+                        } else {
+                          subnodes <-
+                            setdiff(subnodes, attrs)
+                          sprintf(" id = '%s'", private[[attrs[1]]]$id)
+                        }
+                        # "'attr'"
+                      },
+                      # value
+                      {
+                        sapply(
+                          subnodes,
+                          function(name) {
+                            subnode.name <- gsub("^\\.(.*)$",
+                                                 "\\1", name)
+                            switch(
+                              typeof(private[[name]]),
+                              closure = NULL,
+                              list =
+                                sapply(private[[name]],
+                                       function(sublist)
+                                         sublist$.asXMLnodes(subnode.name)) %>>%
+                                # .[!sapply(., is.null)] %>>%
+                                paste0(collapse = "\n")
+                              ,
+                              environment = {
+                                private[[name]]$.asXMLnodes(subnode.name)
+                              },
+                              {
+                                if (is.null(private[[name]]) ||
+                                    is.na(private[[name]])) {
+                                  NULL
+                                } else {
+                                  sprintf("<%s>%s</%s>\n",
+                                          subnode.name,
+                                          switch(
+                                            typeof(private[[name]]),
+                                            logical =
+                                              ifelse(private[[name]],
+                                                     "true",
+                                                     "false"
+                                              ),
+                                            private[[name]]
+                                          ),
+                                          subnode.name
+                                  )
+                                }
+                              })
+                          }) %>>%
+                          (vals ~ vals[!sapply(vals, is.null)]) %>>%
+                          paste0(collapse = "")
+                      },
+                      node.name)
             },
             print = function(...) {
-              sapply(names(private)[-which(names(private) == 
-                                             "deep_clone")],
+              elements <- names(private)[-which(names(private) ==
+                                                  "deep_clone")] %>>% rev
+              sapply(elements,
                      function(name) {
                        sprintf(
                          "\t%s: %s",
@@ -105,7 +119,7 @@ rdmlBaseType <-
                            typeof(private[[name]]),
                            closure = NULL,
                            list = sprintf("[%s]",
-                                          names(private[[name]]) %>% 
+                                          names(private[[name]]) %>>%
                                             paste(collapse = ", ")),
                            environment = {
                              sprintf("~ %s",
@@ -119,21 +133,25 @@ rdmlBaseType <-
                              else
                                sprintf("%s", private[[name]])
                            }))
-                     }) %>% 
-                paste(sep = "\n", collapse = "\n") %>% 
+                     }) %>>%
+                paste(sep = "\n", collapse = "\n") %>>%
                 cat
+              cat("\n")
             }
           ),
           private = list(
             deep_clone = function(name, value) {
-              if (value %>% is.null)
+              if (is.null(value))
                 return(NULL)
-              if (value %>%
-                  class %>% 
-                  tail(1) != "R6") {
-                if (is.list(value)) {
-                  llply(value,
-                        function(el) el$clone(deep = TRUE))
+              if (tail(class(value), 1) != "R6") {
+                if (is.list(value) && !is.data.table(value)) {
+                  list.map(value,
+                        el ~ {
+                          if (tail(class(el), 1) == "R6")
+                            el$clone(deep = TRUE)
+                          else
+                            el
+                        })
                 } else {
                   value
                 }
@@ -147,25 +165,25 @@ rdmlBaseType <-
 # rdmlIdType ------------------------------------------------------------
 
 #' rdmlIdType R6 class.
-#' 
-#' This element can be used to assign a publisher and id to the RDML file.\cr 
+#'
+#' This element can be used to assign a publisher and id to the RDML file.\cr
 #' Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{rdmlIdType$new(publisher, serialNumber,
+#'
+#' @section Initialization: \preformatted{rdmlIdType$new(publisher, serialNumber,
 #'   MD5Hash = NULL)}
-#'   
-#' @section Fields: \describe{  
-#'   \item{\code{publisher}}{\link[assertthat]{is.string}. RDML file publisher.}
-#'   \item{\code{serialNumber}}{\link[assertthat]{is.string}. Serial number.} 
-#'   \item{\code{MD5Hash}}{\link[assertthat]{is.string}. An MD5Hash calculated
+#'
+#' @section Fields: \describe{
+#'   \item{\code{publisher}}{\link[checkmate]{checkString}. RDML file publisher.}
+#'   \item{\code{serialNumber}}{\link[checkmate]{checkString}. Serial number.}
+#'   \item{\code{MD5Hash}}{\link[checkmate]{checkString}. An MD5Hash calculated
 #'   over the complete file after removing all rdmlIDTypes and all whitespaces
 #'   between elements.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-rdmlIdType <- 
+rdmlIdType <-
   R6Class("rdmlIdType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -173,9 +191,10 @@ rdmlIdType <-
             initialize = function(publisher,
                                   serialNumber,
                                   MD5Hash = NULL) {
-              assert_that(is.string(publisher))
-              assert_that(is.string(serialNumber))
-              assert_that(is.opt.string(MD5Hash))
+              assertString(publisher)
+              assertString(serialNumber)
+              assert(checkNull(MD5Hash),
+                     checkString(MD5Hash))
               private$.publisher <- publisher
               private$.serialNumber <- serialNumber
               private$.MD5Hash <- MD5Hash
@@ -190,19 +209,20 @@ rdmlIdType <-
             publisher = function(publisher) {
               if (missing(publisher))
                 return(private$.publisher)
-              assert_that(is.string(publisher))
+              assertString(publisher)
               private$.publisher <- publisher
             },
             serialNumber = function(serialNumber) {
               if (missing(serialNumber))
                 return(private$.serialNumber)
-              assert_that(is.string(serialNumber))
+              assertString(serialNumber)
               private$.serialNumber <- serialNumber
             },
             MD5Hash = function(MD5Hash) {
               if (missing(MD5Hash))
                 return(private$.MD5Hash)
-              assert_that(is.opt.string(MD5Hash))
+              assert(checkNull(MD5Hash),
+                     checkString(MD5Hash))
               private$.MD5Hash <- MD5Hash
             }
           ))
@@ -210,30 +230,35 @@ rdmlIdType <-
 # idType ------------------------------------------------------------
 
 #' idType R6 class.
-#' 
-#' Contains identificator for varius RDML types.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{idType$new(id)}
 #'
-#'   @section Fields: \describe{     
-#' \item{\code{id}}{\link[assertthat]{is.string}. Identificator.}
+#' Contains identificator for varius RDML types. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{idType$new(id)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{id}}{\link[checkmate]{checkString}. Identificator.}
 #' }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-idType <- 
+idType <-
   R6Class("idType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(id) {
-              assert_that(is.string(id))
+              assertString(id)
               private$.id <- id
-            }#,
-            #             print = function(...) {
-            #               cat(private$.id)
-            #             }
+            },
+            .asXMLnodes = function(node.name) {
+              sprintf("<%s id = '%s'/>",
+                      node.name,
+                      private$.id)
+            }
+            #                         print = function(...) {
+            #                           cat(private$.id)
+            #                         }
           ),
           private = list(
             .id = NULL
@@ -242,7 +267,7 @@ idType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.string(id))
+              assertString(id)
               private$.id <- id
             }
           ))
@@ -250,25 +275,25 @@ idType <-
 # reactIdType ------------------------------------------------------------
 
 #' reactIdType R6 class.
-#' 
-#' Contains identificator for reactType.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{reactIdType$new(id)}
 #'
-#'   @section Fields: \describe{     
-#' \item{\code{id}}{\link[assertthat]{is.count}. Identificator.}
+#' Contains identificator for reactType. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{reactIdType$new(id)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{id}}{\link[checkmate]{checkCount}. Identificator.}
 #' }
-#' 
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-reactIdType <- 
+reactIdType <-
   R6Class("reactIdType",
           # class = FALSE,
-          inherit = rdmlBaseType,
+          inherit = idType,
           public = list(
             initialize = function(id) {
-              assert_that(is.count(id))
+              assertCount(id)
               private$.id <- id
             }#,
             #             print = function(...) {
@@ -282,7 +307,7 @@ reactIdType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.count(id))
+              assertCount(id)
               private$.id <- id
             }
           ))
@@ -290,19 +315,19 @@ reactIdType <-
 # idReferencesType ------------------------------------------------------------
 
 #' idReferencesType R6 class.
-#' 
-#' Contains id of another RDML object.Inherits: \link{idType}.
-#' 
-#' @section Initialization: \code{idReferencesType$new(id)}
-#' 
-#' @section Fields: \describe{  
-#' \item{\code{id}}{\link[assertthat]{is.string}. Identificator.}
+#'
+#' Contains id of another RDML object. Inherits: \link{idType}.
+#'
+#' @section Initialization: \preformatted{idReferencesType$new(id)}
+#'
+#' @section Fields: \describe{
+#' \item{\code{id}}{\link[checkmate]{checkString}. Identificator.}
 #' }
-#'         
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-idReferencesType <- 
+idReferencesType <-
   R6Class("idReferencesType",
           # class = FALSE,
           inherit = idType)
@@ -310,25 +335,25 @@ idReferencesType <-
 # experimenterType ------------------------------------------------------------
 
 #' experimenterType R6 class.
-#' 
-#' Contact details of the experimenter.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{experimenterType$new(id, firstName, lastName,
+#'
+#' Contact details of the experimenter. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{experimenterType$new(id, firstName, lastName,
 #'   email = NULL, labName = NULL, labAddress = NULL)}
-#'  
-#'   @section Fields: \describe{   
+#'
+#'   @section Fields: \describe{
 #' \item{\code{id}}{\link{idType}. Identificator.}
-#' \item{\code{firstName}}{\link[assertthat]{is.string}. First name.}
-#' \item{\code{lastName}}{\link[assertthat]{is.string}. Last name.}
-#' \item{\code{email}}{\link[assertthat]{is.string}. Email.}
-#' \item{\code{labName}}{\link[assertthat]{is.string}. Lab name.}
-#' \item{\code{labAddress}}{\link[assertthat]{is.string}. Lab address.}
+#' \item{\code{firstName}}{\link[checkmate]{checkString}. First name.}
+#' \item{\code{lastName}}{\link[checkmate]{checkString}. Last name.}
+#' \item{\code{email}}{\link[checkmate]{checkString}. Email.}
+#' \item{\code{labName}}{\link[checkmate]{checkString}. Lab name.}
+#' \item{\code{labAddress}}{\link[checkmate]{checkString}. Lab address.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-experimenterType <- 
+experimenterType <-
   R6Class("experimenterType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -339,12 +364,15 @@ experimenterType <-
                                   email = NULL,
                                   labName = NULL,
                                   labAddress = NULL) {
-              assert_that(is.type(id, idType))
-              assert_that(is.string(firstName))
-              assert_that(is.string(lastName))
-              assert_that(is.opt.string(email))
-              assert_that(is.opt.string(labName))
-              assert_that(is.opt.string(labAddress))
+              assertClass(id, "idType")
+              assertString(firstName)
+              assertString(lastName)
+              assert(checkNull(email),
+                     checkString(email))
+              assert(checkNull(labName),
+                     checkString(labName))
+              assert(checkNull(labAddress),
+                     checkString(labAddress))
               private$.id <- id
               private$.firstName <- firstName
               private$.lastName <- lastName
@@ -365,37 +393,40 @@ experimenterType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id, idType))
+              assertClass(id, "idType")
               private$.id <- id
             },
             firstName = function(firstName) {
               if (missing(firstName))
                 return(private$.firstName)
-              assert_that(is.string(firstName))
+              assertString(firstName)
               private$.firstName <- firstName
             },
             lastName = function(lastName) {
               if (missing(lastName))
                 return(private$.lastName)
-              assert_that(is.string(lastName))
+              assertString(lastName)
               private$.lastName <- lastName
             },
             email = function(email) {
               if (missing(email))
                 return(private$.email)
-              assert_that(is.opt.string(email))
+              assert(checkNull(email),
+                     checkString(email))
               private$.email <- email
             },
             labName = function(labName) {
               if (missing(labName))
                 return(private$.labName)
-              assert_that(is.opt.string(labName))
+              assert(checkNull(labName),
+                     checkString(labName))
               private$.labName <- labName
             },
             labAddress = function(labAddress) {
               if (missing(labAddress))
                 return(private$.labAddress)
-              assert_that(is.opt.string(labAddress))
+              assert(checkNull(labAddress),
+                     checkString(labAddress))
               private$.labAddress <- labAddress
             }
           ))
@@ -403,29 +434,30 @@ experimenterType <-
 # documentationType ------------------------------------------------------------
 
 #' documentationType R6 class.
-#' 
+#'
 #' These elements should be used if the same description applies to many
-#' samples, targets or experiments.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{documentationType$new(id, text = NULL)}
-#'   
-#'   @section Fields: \describe{  
+#' samples, targets or experiments. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{documentationType$new(id, text = NULL)}
+#'
+#'   @section Fields: \describe{
 #' \item{\code{id}}{\link{idType}. Identificator.}
-#' \item{\code{text}}{\link[assertthat]{is.string}. Text.}
+#' \item{\code{text}}{\link[checkmate]{checkString}. Text.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-documentationType <- 
+documentationType <-
   R6Class("documentationType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(id,
                                   text = NULL) {
-              assert_that(is.type(id, idType))
-              assert_that(is.opt.string(text))
+              assertClass(id, "idType")
+              assert(checkNull(text),
+                     checkString(text))
               private$.id <- id
               private$.text <- text
             }
@@ -438,13 +470,14 @@ documentationType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id, idType))
+              assertClass(id, "idType")
               private$.id <- id
             },
             text = function(text) {
               if (missing(text))
                 return(private$.text)
-              assert_that(is.opt.string(text))
+              assert(checkNull(text),
+                     checkString(text))
               private$.text <- text
             }
           ))
@@ -452,28 +485,29 @@ documentationType <-
 # dyeType ------------------------------------------------------------
 
 #' dyeType R6 class.
-#' 
-#' Information on a dye.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{dyeType$new(id, description = NULL)}
-#'   
-#'   @section Fields: \describe{  
+#'
+#' Detailed information about the dye. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{dyeType$new(id, description = NULL)}
+#'
+#'   @section Fields: \describe{
 #' \item{\code{id}}{\link{idType}. Identificator.}
-#' \item{\code{description}}{ \link[assertthat]{is.string}. Description.
+#' \item{\code{description}}{ \link[checkmate]{checkString}. Description.
 #'   }}
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-dyeType <- 
+dyeType <-
   R6Class("dyeType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(id,
                                   description = NULL) {
-              assert_that(is.type(id, idType))
-              assert_that(is.opt.string(description))
+              assertClass(id, "idType")
+              assert(checkNull(description),
+                     checkString(description))
               private$.id <- id
               private$.description <- description
             }
@@ -486,13 +520,14 @@ dyeType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id, idType))
+              assertClass(id, "idType")
               private$.id <- id
             },
             description = function(description) {
               if (missing(description))
                 return(private$.description)
-              assert_that(is.opt.string(description))
+              assert(checkNull(description),
+                     checkString(description))
               private$.description <- description
             }
           ))
@@ -500,30 +535,32 @@ dyeType <-
 # xRefType ------------------------------------------------------------
 
 #' xRefType R6 class.
-#' 
+#'
 #' Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{xRefType$new(name = NULL, id = NULL)}
-#'   
-#'   @section Fields: \describe{  
-#'   \item{\code{name}}{\link[assertthat]{is.string}. Reference to an external
-#'   database, } for example "GenBank". 
-#'   \item{\code{id}}{\link[assertthat]{is.string}. The ID of the entry within
+#'
+#' @section Initialization: \preformatted{xRefType$new(name = NULL, id = NULL)}
+#'
+#'   @section Fields: \describe{
+#'   \item{\code{name}}{\link[checkmate]{checkString}. Reference to an external
+#'   database, } for example "GenBank".
+#'   \item{\code{id}}{\link[checkmate]{checkString}. The ID of the entry within
 #'   the external database, for example "AJ832138".}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-xRefType <- 
+xRefType <-
   R6Class("xRefType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(name = NULL,
                                   id = NULL) {
-              assert_that(is.opt.string(name))
-              assert_that(is.opt.string(id))
+              assert(checkNull(name),
+                     checkString(name))
+              assert(checkNull(id),
+                     checkString(id))
               private$.name <- name
               private$.id <- id
             }
@@ -536,13 +573,15 @@ xRefType <-
             name = function(name) {
               if (missing(name))
                 return(private$.name)
-              assert_that(is.opt.string(name))
+              assert(checkNull(name),
+                     checkString(name))
               private$.name <- name
             },
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.opt.string(id))
+              assert(checkNull(id),
+                     checkString(id))
               private$.id <- id
             }
           ))
@@ -550,26 +589,29 @@ xRefType <-
 # annotationType ------------------------------------------------------------
 
 #' annotationType R6 class.
-#' 
-#' These elements should be used to annotate samples by setting a property and a
-#' value. A property could be sex, the value M or F.Inherits:
+#'
+#' Annotate samples by setting a property and its value. For example,
+#' sex could be a property with the possible values M or F. Inherits:
 #' \link{rdmlBaseType}.
-#' 
-#' @section Fields: \describe{ \item{property}{\link[assertthat]{is.string}.
-#'   Property} \item{value}{\link[assertthat]{is.string}. Value} }
-#'   
+#'
+#' @section Fields: \describe{ \item{property}{\link[checkmate]{checkString}.
+#'   Property name} \item{value}{\link[checkmate]{checkString}. Value} }
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-annotationType <- 
+#' @examples
+#' #set sex property
+#' annotationType$new(property = "sex", value = "M")
+annotationType <-
   R6Class("annotationType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(property,
                                   value) {
-              assert_that(is.string(property))
-              assert_that(is.string(value))
+              assertString(property)
+              assertString(value)
               private$.property <- property
               private$.value <- value
             }
@@ -582,13 +624,13 @@ annotationType <-
             property = function(property) {
               if (missing(property))
                 return(private$.property)
-              assert_that(is.string(property))
+              assertString(property)
               private$.property <- property
             },
             value = function(value) {
               if (missing(value))
                 return(private$.value)
-              assert_that(is.string(value))
+              assertString(value)
               private$.value <- value
             }
           ))
@@ -596,30 +638,29 @@ annotationType <-
 # quantityType ------------------------------------------------------------
 
 #' quantityType R6 class.
-#' 
-#' A quantity is always defined by its value and its unit.Inherits:
+#'
+#' A quantity is always defined by its value and its unit. Inherits:
 #' \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{quantityType$new(value, unit)}
-#' 
-#'   @section Fields: \describe{    
-#' \item{\code{value}}{\link[base]{is.double}. Value.}
+#'
+#' @section Initialization: \preformatted{quantityType$new(value, unit)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{value}}{\link[checkmate]{checkNumber}. Value.}
 #' \item{\code{unit}}{\link{quantityUnitType}. Unit.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-quantityType <- 
+quantityType <-
   R6Class("quantityType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(value,
                                   unit) {
-              assert_that(is.float(value))
-              assert_that(is.type(unit,
-                                  quantityUnitType))
+              assertNumber(value)
+              assertClass(unit, "quantityUnitType")
               private$.value <- value
               private$.unit <- unit
             }
@@ -632,14 +673,13 @@ quantityType <-
             value = function(value) {
               if (missing(value))
                 return(private$.value)
-              assert_that(is.float(value))
+              assertNumber(value)
               private$.value <- value
             },
             unit = function(unit) {
               if (missing(unit))
                 return(private$.unit)
-              assert_that(is.type(unit,
-                                  quantityUnitType))
+              assertClass(unit, "quantityUnitType")
               private$.unit <- unit
             }
           ))
@@ -647,25 +687,27 @@ quantityType <-
 # cdnaSynthesisMethodType ------------------------------------------------------------
 
 #' cdnaSynthesisMethodType R6 class.
-#' 
-#' Description of the cDNA synthesis method.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{cdnaSynthesisMethodType$new(enzyme = NULL, 
-#'   primingMethod = NULL, dnaseTreatment = NULL, thermalCyclingConditions = 
+#'
+#' Description of the cDNA synthesis method. Inherits: \link{rdmlBaseType}.
+#'
+#' @section
+#' Initialization: \preformatted{cdnaSynthesisMethodType$new(enzyme = NULL,
+#'   primingMethod = NULL, dnaseTreatment = NULL, thermalCyclingConditions =
 #'   NULL)}
-#'   
-#'   @section Fields: \describe{  
-#'   \item{\code{enzyme}}{\link[base]{is.double}. Enzyme used for reverse
-#'   transcription.} \item{\code{primingMethod}}{\link{primingMethodType}.} 
-#'   \item{\code{dnaseTreatment}}{\link[assertthat]{is.flag} True if RNA was
+#'
+#'   @section Fields: \describe{
+#'   \item{\code{enzyme}}{\link[checkmate]{checkString}. Name of the enzyme used for
+#'   reverse transcription.}
+#'   \item{\code{primingMethod}}{\link{primingMethodType}.}
+#'   \item{\code{dnaseTreatment}}{\link[checkmate]{checkFlag} if \code{TRUE}RNA was
 #'   DNAse treated prior cDNA synthesis.}
 #'   \item{\code{thermalCyclingConditions}}{\link{idReferencesType}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-cdnaSynthesisMethodType <- 
+cdnaSynthesisMethodType <-
   R6Class("cdnaSynthesisMethodType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -674,12 +716,14 @@ cdnaSynthesisMethodType <-
                                   primingMethod = NULL,
                                   dnaseTreatment = NULL,
                                   thermalCyclingConditions = NULL) {
-              assert_that(is.opt.string(enzyme))
-              assert_that(is.opt.type(primingMethod,
-                                      primingMethodType))
-              assert_that(is.opt.flag(dnaseTreatment))
-              assert_that(is.opt.type(thermalCyclingConditions,
-                                      idType))
+              assert(checkNull(enzyme),
+                     checkString(enzyme))
+              assert(checkNull(primingMethod),
+                     checkClass(primingMethod, "primingMethodType"))
+              assert(checkNull(dnaseTreatment),
+                     checkFlag(dnaseTreatment))
+              assert(checkNull(thermalCyclingConditions),
+                     checkClass(thermalCyclingConditions, "idType"))
               private$.enzyme <- enzyme
               private$.primingMethod <- primingMethod
               private$.dnaseTreatment <- dnaseTreatment
@@ -696,27 +740,29 @@ cdnaSynthesisMethodType <-
             enzyme = function(enzyme) {
               if (missing(enzyme))
                 return(private$.enzyme)
-              assert_that(is.opt.string(enzyme))
+              assert(checkNull(enzyme),
+                     checkString(enzyme))
               private$.enzyme <- enzyme
             },
             primingMethod = function(primingMethod) {
               if (missing(primingMethod))
                 return(private$.primingMethod)
-              assert_that(is.opt.type(primingMethod,
-                                      primingMethodType))
+              assert(checkNull(primingMethod),
+                     checkClass(primingMethod, "primingMethodType"))
               private$.primingMethod <- primingMethod
             },
             dnaseTreatment = function(dnaseTreatment) {
               if (missing(dnaseTreatment))
                 return(private$.dnaseTreatment)
-              assert_that(is.opt.flag(dnaseTreatment))
+              assert(checkNull(dnaseTreatment),
+                     checkFlag(dnaseTreatment))
               private$.dnaseTreatment <- dnaseTreatment
             },
             thermalCyclingConditions = function(thermalCyclingConditions) {
               if (missing(thermalCyclingConditions))
                 return(private$.thermalCyclingConditions)
-              assert_that(is.opt.type(thermalCyclingConditions,
-                                      idType))
+              assert(checkNull(thermalCyclingConditions),
+                     checkClass(thermalCyclingConditions, "idType"))
               private$.thermalCyclingConditions <- thermalCyclingConditions
             }
           ))
@@ -724,13 +770,13 @@ cdnaSynthesisMethodType <-
 # templateQuantityType ------------------------------------------------------------
 
 #' templateQuantityType R6 class.
-#' 
+#'
 #' Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{templateQuantityType$new(conc, nucleotide)}
-#'   
-#'   @section Fields: \describe{  
-#' \item{\code{conc}}{\link[base]{is.double}. Concentration of the template in nanogram}
+#'
+#' @section Initialization: \preformatted{templateQuantityType$new(conc, nucleotide)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{conc}}{\link[checkmate]{checkNumber}. Concentration of the template in nanogram}
 #'   per microliter in the final reaction mix.
 #' \item{\code{nucleotide}}{\link{nucleotideType}.}
 #'   }
@@ -738,16 +784,15 @@ cdnaSynthesisMethodType <-
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-templateQuantityType <- 
+templateQuantityType <-
   R6Class("templateQuantityType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(conc,
                                   nucleotide) {
-              assert_that(is.float(conc))
-              assert_that(is.type(nucleotide,
-                                  nucleotideType))
+              assertNumber(conc)
+              assertClass(nucleotide, "nucleotideType")
               private$.conc <- conc
               private$.nucleotide <- nucleotide
             }
@@ -760,14 +805,13 @@ templateQuantityType <-
             conc = function(conc) {
               if (missing(conc))
                 return(private$.conc)
-              assert_that(is.float(conc))
+              assertNumber(conc)
               private$.conc <- conc
             },
             nucleotide = function(nucleotide) {
               if (missing(nucleotide))
                 return(private$.nucleotide)
-              assert_that(is.type(nucleotide,
-                                  nucleotideType))
+              assertClass(nucleotide, "nucleotideType")
               private$.nucleotide <- nucleotide
             }
           ))
@@ -775,28 +819,38 @@ templateQuantityType <-
 # enumType ------------------------------------------------------------
 
 #' enumType R6 class.
-#' 
-#' Generic class for creating objects thet can take limited list of values.\cr
+#'
+#' Generic class for creating objects thet can take limited list of values. \cr
 #' Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{enumType$new(value)}
-#'   @section Fields: \describe{  
-#' \item{\code{value}}{\link[assertthat]{is.string}. Value.}
+#'
+#' @section Initialization: \preformatted{enumType$new(value)}
+#'   @section Fields: \describe{
+#' \item{\code{value}}{\link[checkmate]{checkString}. Value.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
-enumType <- 
+enumType <-
   R6Class("enumType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(value, ...) {
-              assert_that(is.enum(value, private$.levels))
+              assert(checkNull(value), checkChoice(value, c(private$.levels)))
               private$.value <- value
             },
             print = function(...) {
               cat(private$.value)
+            },
+            .asXMLnodes = function(node.name) {
+              if (is.null(private$.value) ||
+                  is.na(private$.value))
+                NULL
+              else
+                sprintf("<%s>%s</%s>",
+                        node.name,
+                        private$.value,
+                        node.name)
             }
           ),
           private = list(
@@ -806,7 +860,7 @@ enumType <-
             value = function(value) {
               if (missing(value))
                 return(private$.value)
-              assert_that(is.enum(value, private$.levels))
+              assertChoice(value, c(private$.levels))
               private$.value <- value
             }
           ))
@@ -814,7 +868,7 @@ enumType <-
 # sampleTypeType ------------------------------------------------------------
 
 #' sampleTypeType R6 class.
-#' 
+#'
 #' Can take values:
 #' \describe{
 #' \item{unkn}{unknown sample}
@@ -825,19 +879,19 @@ enumType <-
 #' \item{nrt}{minusRT}
 #' \item{pos}{positive control}
 #' \item{opt}{optical calibrator sample}}
-#' 
+#'
 #' Inherits: \link{enumType}.
-#' 
-#' @section Initialization: \code{sampleTypeType$new(value)}
-#'  
-#'   @section Fields: \describe{   
-#' \item{\code{value}}{\link[assertthat]{is.string}. Value.}
+#'
+#' @section Initialization: \preformatted{sampleTypeType$new(value)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{value}}{\link[checkmate]{checkString}. Value.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-sampleTypeType <- 
+sampleTypeType <-
   R6Class("sampleTypeType",
           # class = FALSE,
           inherit = enumType,
@@ -851,7 +905,7 @@ sampleTypeType <-
 # quantityUnitType ------------------------------------------------------------
 
 #' quantityUnitType R6 class.
-#' 
+#'
 #' The unit the quantity. Can take values:
 #' \describe{
 #' \item{cop}{copies per microliter  }
@@ -861,19 +915,19 @@ sampleTypeType <-
 #' \item{ng}{nanogram per microliter }
 #' \item{other}{other unit (must be linear, no exponents or logarithms allowed) }
 #' }
-#' 
+#'
 #' Inherits: \link{enumType}.
-#' 
-#' @section Initialization: \code{quantityUnitType$new(value)}
-#'   
-#'   @section Fields: \describe{  
-#' \item{\code{value}}{\link[assertthat]{is.string}. Value.}
+#'
+#' @section Initialization: \preformatted{quantityUnitType$new(value)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{value}}{\link[checkmate]{checkString}. Value.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-quantityUnitType <- 
+quantityUnitType <-
   R6Class("quantityUnitType",
           # class = FALSE,
           inherit = enumType,
@@ -885,28 +939,28 @@ quantityUnitType <-
 # primingMethodType ------------------------------------------------------------
 
 #' primingMethodType R6 class.
-#' 
-#' The primers used to reverse transcribe the RNA to cDNA. Can take values:
+#'
+#' The primers used in the reverse transcription. Can take values:
 #' \describe{
 #' \item{oligo-dt}{}
 #' \item{random}{}
 #' \item{target-specific}{}
 #' \item{oligo-dt and random}{}
-#' \item{other}{} 
+#' \item{other}{}
 #' }
-#' 
+#'
 #' Inherits: \link{enumType}.
-#' 
-#' @section Initialization: \code{primingMethodType$new(value)}
-#'   
-#'   @section Fields: \describe{  
-#' \item{\code{value}}{\link[assertthat]{is.string}. Value.}
+#'
+#' @section Initialization: \preformatted{primingMethodType$new(value)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{value}}{\link[checkmate]{checkString}. Value.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-primingMethodType <- 
+primingMethodType <-
   R6Class("primingMethodType",
           # class = FALSE,
           inherit = enumType,
@@ -922,33 +976,33 @@ primingMethodType <-
 # nucleotideType ------------------------------------------------------------
 
 #' nucleotideType R6 class.
-#' 
-#' Can take values:
+#'
+#' Type of nucleic acid used as a template in the experiment. May have following values:
 #' \describe{
 #' \item{DNA}{}
-#' \item{genomic-DNA}{}
+#' \item{genomic DNA}{}
 #' \item{cDNA}{}
 #' \item{RNA}{}
 #' }
-#' 
+#'
 #' Inherits: \link{enumType}.
-#' 
-#' @section Initialization: \code{nucleotideType$new(value)}
-#'   
-#'   @section Fields: \describe{  
-#' \item{\code{value}}{\link[assertthat]{is.string}. Value.}
+#'
+#' @section Initialization: \preformatted{nucleotideType$new(value)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{value}}{\link[checkmate]{checkString}. Value.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-nucleotideType <- 
+nucleotideType <-
   R6Class("nucleotideType",
           # class = FALSE,
           inherit = enumType,
           private = list(
             .levels = c("DNA",
-                        "genomic-DNA",
+                        "genomic DNA",
                         "cDNA",
                         "RNA")
           )
@@ -958,47 +1012,49 @@ nucleotideType <-
 
 #'sampleType R6 class.
 #'
-#'A sample is a defined template solution. Dilutions of the same material differ
-#'in concentration and are considered different samples. A technical replicate 
-#'samples should contain the same name (reactions are performed on the same 
-#'material), and biological replicates should contain different names (the 
-#'nucleic acids derived from the different biological replicates are not the 
-#'same). Serial dilutions in a standard curve must have a different name.\cr 
-#'Inherits: \link{rdmlBaseType}.
+#' A sample is a template solution with defined concentation. Since dilutions
+#' of the same material differ in concentration, they are considered different
+#' samples. A technical replicate samples should contain the same name (reactions
+#' are performed on the same material), and biological replicates should contain
+#' different names (the template derived from the different biological replicates
+#' is are divergent). Serial dilutions in a standard curve must have different
+#' names (preferably stating their dillution).
+#' Inherits: \link{rdmlBaseType}.
 #'
-#'@section Initialization: \code{sampleType$new(id, description = NULL, 
-#'  documentation = NULL, xRef =  NULL, annotation = NULL, type = 
-#'  sampleTypeType$new("unkn"), interRunCalibrator = FALSE, quantity = NULL, 
-#'  calibratorSample = FALSE, cdnaSynthesisMethod = NULL, templateQuantity = 
+#'@section Initialization: \preformatted{sampleType$new(id, description = NULL,
+#'  documentation = NULL, xRef =  NULL, annotation = NULL, type =
+#'  sampleTypeType$new("unkn"), interRunCalibrator = FALSE, quantity = NULL,
+#'  calibratorSample = FALSE, cdnaSynthesisMethod = NULL, templateQuantity =
 #'  NULL)}
-#'  
-#'  @section Fields: \describe{  
+#'
+#'  @section Fields: \describe{
 #'  \item{\code{id}}{\link{idType}. Concentration of the template in nanogram
 #'  per microliter in the final reaction mix. }
-#'  \item{\code{description}}{\link[assertthat]{is.string}.} 
-#'  \item{\code{documentation}}{\code{list} of \link{idReferencesType}.} 
-#'  \item{\code{xRef}}{\code{list} of \link{xRefType}.} 
-#'  \item{\code{annotation}}{\code{list} of \link{annotationType}.} 
-#'  \item{\code{type}}{\link{sampleTypeType}.} 
-#'  \item{\code{interRunCalibrator}}{\link[assertthat]{is.flag}. True if this
-#'  sample is used as inter run calibrator. }
+#'  \item{\code{description}}{\link[checkmate]{checkString}.}
+#'  \item{\code{documentation}}{\code{list} of \link{idReferencesType}.}
+#'  \item{\code{xRef}}{\code{list} of \link{xRefType}.}
+#'  \item{\code{annotation}}{\code{list} of \link{annotationType}.}
+#'  \item{\code{type}}{\link{sampleTypeType}.}
+#'  \item{\code{interRunCalibrator}}{\link[checkmate]{checkFlag}. \code{TRUE}
+#'  if this sample is used as inter run calibrator. }
 #'  \item{\code{quantity}}{\link{quantityType}. Quantity - The reference
 #'  quantity of this sample. It should be only used if the sample is part of a
 #'  standard curve. The provided value will be used to quantify unknown samples
-#'  in absolute quantification assays. Only the use of true numbers is valid
-#'  like 1, 10, 100, 1000 or 1, 0.1, 0.01, 0.001. The use of exponents is not
-#'  valid like 1, 2, 3, 4 or -1, -2, -3, -4 because it will not be interpreted
-#'  as 10E1, 10E2, 10E3, 10E4 or 10E-1, 10E-2, 10E-3, 10E-4. }
-#'  \item{\code{calibratorSample}}{\link[assertthat]{is.flag}. True if this
+#'  in absolute quantification assays. Only the use of positive integers (like 1,
+#'  10, 100, 1000) and fractions (e.g. 1, 0.1, 0.01, 0.001) is acceptable.
+#'  The use of exponents (1, 2, 3, 4 or -1, -2, -3, -4) if forbidden,
+#'  because it will not be interpreted as 10E1, 10E2, 10E3, 10E4 or 10E-1, 10E-2,
+#'  10E-3, 10E-4. }
+#'  \item{\code{calibratorSample}}{\link[checkmate]{checkFlag}. \code{TRUE} if this
 #'  sample is used as calibrator sample. }
-#'  \item{\code{cdnaSynthesisMethod}}{\link{cdnaSynthesisMethodType}.} 
+#'  \item{\code{cdnaSynthesisMethod}}{\link{cdnaSynthesisMethodType}.}
 #'  \item{\code{templateQuantity}}{\link{templateQuantityType}.}
 #'  }
-#'  
+#'
 #'@docType class
 #'@format An \code{\link{R6Class}} generator object.
 #'@export
-sampleType <- 
+sampleType <-
   R6Class("sampleType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -1014,31 +1070,33 @@ sampleType <-
                                   calibratorSample = FALSE,
                                   cdnaSynthesisMethod = NULL,
                                   templateQuantity = NULL) {
-              assert_that(is.type(id, idType))
-              assert_that(is.opt.string(description))
-              assert_that(is.opt.list.type(documentation,
-                                           idReferencesType))
-              assert_that(is.opt.list.type(xRef,
-                                           xRefType))
-              assert_that(is.opt.list.type(annotation,
-                                           annotationType))
-              assert_that(is.type(type,
-                                  sampleTypeType))
-              assert_that(is.opt.flag(interRunCalibrator))
-              assert_that(is.opt.type(quantity,
-                                      quantityType))
-              assert_that(is.opt.flag(calibratorSample))
-              assert_that(is.opt.type(cdnaSynthesisMethod,
-                                      cdnaSynthesisMethodType))
-              assert_that(is.opt.type(templateQuantity,
-                                      templateQuantityType))
-              
+              assertClass(id, "idType")
+              assert(checkNull(description),
+                     checkString(description))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
+              assert(checkNull(xRef),
+                     checkList(xRef, "xRefType"))
+              assert(checkNull(annotation),
+                     checkList(annotation, "annotationType"))
+              assertClass(type, "sampleTypeType")
+              assert(checkNull(interRunCalibrator),
+                     checkFlag(interRunCalibrator))
+              assert(checkNull(quantity),
+                     checkClass(quantity, "quantityType"))
+              assert(checkNull(calibratorSample),
+                     checkFlag(calibratorSample))
+              assert(checkNull(cdnaSynthesisMethod),
+                     checkClass(cdnaSynthesisMethod, "cdnaSynthesisMethodType"))
+              assert(checkNull(templateQuantity),
+                     checkClass(templateQuantity, "templateQuantityType"))
+
               private$.id <- id
               private$.description <- description
               private$.documentation <- documentation
               private$.xRef <- xRef
-              private$.annotation <- with.names(annotation,
-                                                quote(.$property))
+              private$.annotation <- list.names(annotation,
+                                                .$property)
               private$.type <- type
               private$.interRunCalibrator <- interRunCalibrator
               private$.quantity <- quantity
@@ -1064,75 +1122,77 @@ sampleType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id, idType))
+              assertClass(id, "idType")
               private$.id <- id
             },
             description = function(description) {
               if (missing(description))
                 return(private$.description)
-              assert_that(is.opt.string(description))
+              assert(checkNull(description),
+                     checkString(description))
               private$.description <- description
             },
             documentation = function(documentation) {
               if (missing(documentation))
                 return(private$.documentation)
-              assert_that(is.opt.list.type(documentation,
-                                           idReferencesType))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
               private$.documentation <- documentation
             },
             xRef = function(xRef) {
               if (missing(xRef))
                 return(private$.xRef)
-              assert_that(is.opt.list.type(xRef,
-                                           xRefType))
+              assert(checkNull(xRef),
+                     checkList(xRef, "xRefType"))
               private$.xRef <- xRef
             },
             annotation = function(annotation) {
               if (missing(annotation))
                 return(private$.annotation)
-              assert_that(is.opt.list.type(annotation,
-                                           annotationType))
-              private$.annotation <- with.names(annotation,
-                                                quote(.$property))
+              assert(checkNull(annotation),
+                     checkList(annotation, "annotationType"))
+              private$.annotation <- list.names(annotation,
+                                                .$property)
             },
             type = function(type) {
               if (missing(type))
                 return(private$.type)
-              assert_that(is.type(type,
-                                  sampleTypeType))
+              assertClass(type, "sampleTypeType")
               private$.type <- type
             },
             interRunCalibrator = function(interRunCalibrator) {
               if (missing(interRunCalibrator))
                 return(private$.interRunCalibrator)
-              assert_that(is.opt.flag(interRunCalibrator))
+              assert(checkNull(interRunCalibrator),
+                     checkFlag(interRunCalibrator))
               private$.interRunCalibrator <- interRunCalibrator
             },
             quantity = function(quantity) {
               if (missing(quantity))
                 return(private$.quantity)
-              assert_that(is.opt.type(quantity,
-                                      quantityType))
+              assert(checkNull(quantity),
+                     checkClass(quantity, "quantityType"))
               private$.quantity <- quantity
             },
             calibratorSample = function(calibratorSample) {
               if (missing(calibratorSample))
                 return(private$.calibratorSample)
-              assert_that(is.opt.flag(calibratorSample))
+              assert(checkNull(calibratorSample),
+                     checkFlag(calibratorSample))
               private$.calibratorSample <- calibratorSample
             },
             cdnaSynthesisMethod = function(cdnaSynthesisMethod) {
               if (missing(cdnaSynthesisMethod))
                 return(private$.cdnaSynthesisMethod)
-              assert_that(is.opt.type(cdnaSynthesisMethod,
-                                      cdnaSynthesisMethodType))
+              assert(checkNull(cdnaSynthesisMethod),
+                     checkClass(cdnaSynthesisMethod, "cdnaSynthesisMethodType"))
               private$.cdnaSynthesisMethod <- cdnaSynthesisMethod
             },
             templateQuantity = function(templateQuantity) {
               if (missing(templateQuantity))
                 return(private$.templateQuantity)
-              assert_that(is.opt.type(templateQuantity,
-                                      templateQuantityType))
+              assert(checkNull(templateQuantity),
+                     checkClass(templateQuantity, "templateQuantityType"))
               private$.templateQuantity <- templateQuantity
             }
           ))
@@ -1140,24 +1200,24 @@ sampleType <-
 # oligoType ------------------------------------------------------------
 
 #' oligoType R6 class.
-#' 
+#'
 #' Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{oligoType$new(threePrimeTag = NULL, 
+#'
+#' @section Initialization: \preformatted{oligoType$new(threePrimeTag = NULL,
 #'   fivePrimeTag = NULL, sequence)}
-#'   
-#'   @section Fields: \describe{  
-#'   \item{\code{threePrimeTag}}{\link[assertthat]{is.string}. Description of
+#'
+#'   @section Fields: \describe{
+#'   \item{\code{threePrimeTag}}{\link[checkmate]{checkString}. Description of
 #'   three prime modification (if present). }
-#'   \item{\code{fivePrimeTag}}{\link[assertthat]{is.string}. Description of
+#'   \item{\code{fivePrimeTag}}{\link[checkmate]{checkString}. Description of
 #'   five prime modification (if present).}
-#'   \item{\code{sequence}}{\link[assertthat]{is.string}.}
+#'   \item{\code{sequence}}{\link[checkmate]{checkString}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-oligoType <- 
+oligoType <-
   R6Class("oligoType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -1165,9 +1225,11 @@ oligoType <-
             initialize = function(threePrimeTag = NULL,
                                   fivePrimeTag = NULL,
                                   sequence) {
-              assert_that(is.opt.string(threePrimeTag))
-              assert_that(is.opt.string(fivePrimeTag))
-              assert_that(is.string(sequence))
+              assert(checkNull(threePrimeTag),
+                     checkString(threePrimeTag))
+              assert(checkNull(fivePrimeTag),
+                     checkString(fivePrimeTag))
+              assertString(sequence)
               private$.threePrimeTag <- threePrimeTag
               private$.fivePrimeTag <- fivePrimeTag
               private$.sequence <- sequence
@@ -1182,19 +1244,21 @@ oligoType <-
             threePrimeTag = function(threePrimeTag) {
               if (missing(threePrimeTag))
                 return(private$.threePrimeTag)
-              assert_that(is.opt.string(threePrimeTag))
+              assert(checkNull(threePrimeTag),
+                     checkString(threePrimeTag))
               private$.threePrimeTag <- threePrimeTag
             },
             fivePrimeTag = function(fivePrimeTag) {
               if (missing(fivePrimeTag))
                 return(private$.fivePrimeTag)
-              assert_that(is.opt.string(fivePrimeTag))
+              assert(checkNull(fivePrimeTag),
+                     checkString(fivePrimeTag))
               private$.fivePrimeTag <- fivePrimeTag
             },
             sequence = function(sequence) {
               if (missing(sequence))
                 return(private$.sequence)
-              assert_that(is.string(sequence))
+              assertString(sequence)
               private$.sequence <- sequence
             }
           ))
@@ -1202,23 +1266,24 @@ oligoType <-
 # sequencesType ------------------------------------------------------------
 
 #' sequencesType R6 class.
-#' 
+#'
 #' Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{sequencesType$new(forwardPrimer = NULL, reversePrimer = NULL, probe1 = NULL, probe2 = NULL, amplicon = NULL)}
-#'   
-#'   @section Fields: \describe{  
+#'
+#' @section Initialization: \preformatted{sequencesType$new(forwardPrimer = NULL,
+#' reversePrimer = NULL, probe1 = NULL, probe2 = NULL, amplicon = NULL)}
+#'
+#'   @section Fields: \describe{
 #' \item{\code{forwardPrimer}}{\link{oligoType}.}
 #' \item{\code{reversePrimer}}{\link{oligoType}.}
 #' \item{\code{probe1}}{\link{oligoType}.}
 #' \item{\code{probe2}}{\link{oligoType}.}
 #' \item{\code{amplicon}}{\link{oligoType}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-sequencesType <- 
+sequencesType <-
   R6Class("sequencesType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -1228,16 +1293,16 @@ sequencesType <-
                                   probe1 = NULL,
                                   probe2 = NULL,
                                   amplicon = NULL) {
-              assert_that(is.opt.type(forwardPrimer,
-                                      oligoType))
-              assert_that(is.opt.type(reversePrimer,
-                                      oligoType))
-              assert_that(is.opt.type(probe1,
-                                      oligoType))
-              assert_that(is.opt.type(probe2,
-                                      oligoType))
-              assert_that(is.opt.type(amplicon,
-                                      oligoType))
+              assert(checkNull(forwardPrimer),
+                     checkClass(forwardPrimer, "oligoType"))
+              assert(checkNull(reversePrimer),
+                     checkClass(reversePrimer, "oligoType"))
+              assert(checkNull(probe1),
+                     checkClass(probe1, "oligoType"))
+              assert(checkNull(probe2),
+                     checkClass(probe2, "oligoType"))
+              assert(checkNull(amplicon),
+                     checkClass(amplicon, "oligoType"))
               private$.forwardPrimer <- forwardPrimer
               private$.reversePrimer <- reversePrimer
               private$.probe1 <- probe1
@@ -1256,36 +1321,36 @@ sequencesType <-
             forwardPrimer = function(forwardPrimer) {
               if (missing(forwardPrimer))
                 return(private$.forwardPrimer)
-              assert_that(is.opt.type(forwardPrimer,
-                                      oligoType))
+              assert(checkNull(forwardPrimer),
+                     checkClass(forwardPrimer, "oligoType"))
               private$.forwardPrimer <- forwardPrimer
             },
             reversePrimer = function(reversePrimer) {
               if (missing(reversePrimer))
                 return(private$.reversePrimer)
-              assert_that(is.opt.type(reversePrimer,
-                                      oligoType))
+              assert(checkNull(reversePrimer),
+                     checkClass(reversePrimer, "oligoType"))
               private$.reversePrimer <- reversePrimer
             },
             probe1 = function(probe1) {
               if (missing(probe1))
                 return(private$.probe1)
-              assert_that(is.opt.type(probe1,
-                                      oligoType))
+              assert(checkNull(probe1),
+                     checkClass(probe1, "oligoType"))
               private$.probe1 <- probe1
             },
             probe2 = function(probe2) {
               if (missing(probe2))
                 return(private$.probe2)
-              assert_that(is.opt.type(probe2,
-                                      oligoType))
+              assert(checkNull(probe2),
+                     checkClass(probe2, "oligoType"))
               private$.probe2 <- probe2
             },
             amplicon = function(amplicon) {
               if (missing(amplicon))
                 return(private$.amplicon)
-              assert_that(is.opt.type(amplicon,
-                                      oligoType))
+              assert(checkNull(amplicon),
+                     checkClass(amplicon, "oligoType"))
               private$.amplicon <- amplicon
             }
           ))
@@ -1293,29 +1358,29 @@ sequencesType <-
 # commercialAssayType ------------------------------------------------------------
 
 #' commercialAssayType R6 class.
-#' 
-#' For some commercial assays, the primer sequences may be unknown. This element 
-#' allows to describe commercial assays.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{commercialAssayType$new(company, orderNumber)}
-#'   
-#'   @section Fields: \describe{  
-#' \item{\code{company}}{\link[assertthat]{is.string}.}
-#' \item{\code{orderNumber}}{\link[assertthat]{is.string}.}
+#'
+#' For some commercial assays, the primer sequences may be unknown. This element
+#' allows to describe commercial assays. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{commercialAssayType$new(company, orderNumber)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{company}}{\link[checkmate]{checkString}.}
+#' \item{\code{orderNumber}}{\link[checkmate]{checkString}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-commercialAssayType <- 
+commercialAssayType <-
   R6Class("commercialAssayType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(company,
                                   orderNumber) {
-              assert_that(is.string(company))
-              assert_that(is.string(orderNumber))
+              assertString(company)
+              assertString(orderNumber)
               private$.company <- company
               private$.orderNumber <- orderNumber
             }
@@ -1328,13 +1393,13 @@ commercialAssayType <-
             company = function(company) {
               if (missing(company))
                 return(private$.company)
-              assert_that(is.string(company))
+              assertString(company)
               private$.company <- company
             },
             orderNumber = function(orderNumber) {
               if (missing(orderNumber))
                 return(private$.orderNumber)
-              assert_that(is.string(orderNumber))
+              assertString(orderNumber)
               private$.orderNumber <- orderNumber
             }
           ))
@@ -1342,24 +1407,24 @@ commercialAssayType <-
 # targetTypeType ------------------------------------------------------------
 
 #' targetTypeType R6 class.
-#' 
+#'
 #' Can take values:
 #' \describe{
 #' \item{ref}{reference target}
 #' \item{toi}{target of interest}
-#' } 
-#' Inherits: \link{enumType}.
-#' 
-#' @section Initialization: \code{targetTypeType$new(value)}
-#' 
-#'   @section Fields: \describe{  
-#' \item{\code{value}}{\link[assertthat]{is.string}.}
 #' }
-#'  
+#' Inherits: \link{enumType}.
+#'
+#' @section Initialization: \preformatted{targetTypeType$new(value)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{value}}{\link[checkmate]{checkString}.}
+#' }
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-targetTypeType <- 
+targetTypeType <-
   R6Class("targetTypeType",
           # class = FALSE,
           inherit = enumType,
@@ -1372,33 +1437,34 @@ targetTypeType <-
 # targetType ------------------------------------------------------------
 
 #' targetType R6 class.
-#' 
-#' A target is a defined PCR reaction. PCR reactions for the same gene which 
-#' differ in primer sequences are considered different targets.Inherits: 
+#'
+#' A target is a PCR reaction with defined set of primers. PCR reactions
+#' for the same gene with distinct primer sequences are considered different
+#' targets. Inherits:
 #' \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{targetType$new(id, description = NULL, 
-#'   documentation = NULL, xRef = NULL, type, amplificationEfficiencyMethod = 
-#'   NULL, amplificationEfficiency = NULL, amplificationEfficiencySE = NULL, 
+#'
+#' @section Initialization: \preformatted{targetType$new(id, description = NULL,
+#'   documentation = NULL, xRef = NULL, type, amplificationEfficiencyMethod =
+#'   NULL, amplificationEfficiency = NULL, amplificationEfficiencySE = NULL,
 #'   detectionLimit = NULL, dyeId, sequences = NULL, commercialAssay = NULL)}
-#'   
-#' @section Fields: \describe{ \item{\code{id}}{\link{idType}.} 
-#'   \item{\code{description}}{\link[assertthat]{is.string}.} 
-#'   \item{\code{documentation}}{\code{list} of \link{idReferencesType}.} 
-#'   \item{\code{xRef}}{\code{list} of \link{xRefType}.} 
-#'   \item{\code{type}}{\link{targetTypeType}.} 
-#'   \item{\code{amplificationEfficiencyMethod}}{\link[assertthat]{is.string}.} 
-#'   \item{\code{amplificationEfficiency}}{\link[base]{double}.} 
-#'   \item{\code{amplificationEfficiencySE}}{\link[base]{double}.} 
-#'   \item{\code{detectionLimit}}{\link[base]{double}.} 
-#'   \item{\code{dyeId}}{\link{idReferencesType}.} 
-#'   \item{\code{sequences}}{\link{sequencesType}.} 
+#'
+#' @section Fields: \describe{ \item{\code{id}}{\link{idType}.}
+#'   \item{\code{description}}{\link[checkmate]{checkString}.}
+#'   \item{\code{documentation}}{\code{list} of \link{idReferencesType}.}
+#'   \item{\code{xRef}}{\code{list} of \link{xRefType}.}
+#'   \item{\code{type}}{\link{targetTypeType}.}
+#'   \item{\code{amplificationEfficiencyMethod}}{\link[checkmate]{checkString}.}
+#'   \item{\code{amplificationEfficiency}}{\link[checkmate]{checkNumber}.}
+#'   \item{\code{amplificationEfficiencySE}}{\link[checkmate]{checkNumber}.}
+#'   \item{\code{detectionLimit}}{\link[checkmate]{checkNumber}.}
+#'   \item{\code{dyeId}}{\link{idReferencesType}.}
+#'   \item{\code{sequences}}{\link{sequencesType}.}
 #'   \item{\code{commercialAssay}}{\link{commercialAssayType}.} }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-targetType <- 
+targetType <-
   R6Class("targetType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -1415,25 +1481,28 @@ targetType <-
                                   dyeId,
                                   sequences = NULL,
                                   commercialAssay = NULL) {
-              assert_that(is.type(id, idType))
-              assert_that(is.opt.string(description))
-              assert_that(is.opt.list.type(documentation,
-                                           idReferencesType))
-              assert_that(is.opt.list.type(xRef,
-                                           xRefType))
-              assert_that(is.type(type,
-                                  targetTypeType))
-              assert_that(is.opt.string(amplificationEfficiencyMethod))
-              assert_that(is.opt.double(amplificationEfficiency))
-              assert_that(is.opt.double(amplificationEfficiencySE))
-              assert_that(is.opt.double(detectionLimit))
-              assert_that(is.type(dyeId,
-                                  idReferencesType))
-              assert_that(is.opt.type(sequences,
-                                      sequencesType))
-              assert_that(is.opt.type(commercialAssay,
-                                      commercialAssayType))
-              
+              assertClass(id, "idType")
+              assert(checkNull(description),
+                     checkString(description))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
+              assert(checkNull(xRef),
+                     checkList(xRef, "xRefType"))
+              assertClass(type, "targetTypeType")
+              assert(checkNull(amplificationEfficiencyMethod),
+                     checkString(amplificationEfficiencyMethod))
+              assert(checkNull(amplificationEfficiency),
+                     checkNumber(amplificationEfficiency))
+              assert(checkNull(amplificationEfficiencySE),
+                     checkNumber(amplificationEfficiencySE))
+              assert(checkNull(detectionLimit),
+                     checkNumber(detectionLimit))
+              assertClass(dyeId, "idReferencesType")
+              assert(checkNull(sequences),
+                     checkClass(sequences, "sequencesType"))
+              assert(checkNull(commercialAssay),
+                     checkClass(commercialAssay, "commercialAssayType"))
+
               private$.id <- id
               private$.description <- description
               private$.documentation <- documentation
@@ -1466,86 +1535,89 @@ targetType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id, idType))
+              assertClass(id, "idType")
               private$.id <- id
             },
             description = function(description) {
               if (missing(description))
                 return(private$.description)
-              assert_that(is.opt.string(description))
+              assert(checkNull(description),
+                     checkString(description))
               private$.description <- description
             },
             documentation = function(documentation) {
               if (missing(documentation))
                 return(private$.documentation)
-              assert_that(is.opt.list.type(documentation,
-                                           idReferencesType))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
               private$.documentation <- documentation
             },
             xRef = function(xRef) {
               if (missing(xRef))
                 return(private$.xRef)
-              assert_that(is.opt.list.type(xRef,
-                                           xRefType))
+              assert(checkNull(xRef),
+                     checkList(xRef, "xRefType"))
               private$.xRef <- xRef
             },
             type = function(type) {
               if (missing(type))
                 return(private$.type)
-              assert_that(is.type(type,
-                                  targetTypeType))
+              assertClass(type, "targetTypeType")
               private$.type <- type
             },
-            amplificationEfficiencyMethod = 
+            amplificationEfficiencyMethod =
               function(amplificationEfficiencyMethod) {
                 if (missing(amplificationEfficiencyMethod))
                   return(private$.amplificationEfficiencyMethod)
-                assert_that(is.opt.string(amplificationEfficiencyMethod))
+                assert(checkNull(amplificationEfficiencyMethod),
+                       checkString(amplificationEfficiencyMethod))
                 private$.amplificationEfficiencyMethod <- amplificationEfficiencyMethod
               },
             amplificationEfficiency = function(amplificationEfficiency) {
               if (missing(amplificationEfficiency))
                 return(private$.amplificationEfficiency)
-              assert_that(is.opt.double(amplificationEfficiency))
+              assert(checkNull(amplificationEfficiency),
+                     checkNumber(amplificationEfficiency))
               private$.amplificationEfficiency <- amplificationEfficiency
             },
             amplificationEfficiencySE = function(amplificationEfficiencySE) {
               if (missing(amplificationEfficiencySE))
                 return(private$.amplificationEfficiencySE)
-              assert_that(is.opt.double(amplificationEfficiencySE))
+              assert(checkNull(amplificationEfficiencySE),
+                     checkNumber(amplificationEfficiencySE))
               private$.amplificationEfficiencySE <- amplificationEfficiencySE
             },
             detectionLimit = function(detectionLimit) {
               if (missing(detectionLimit))
                 return(private$.detectionLimit)
-              assert_that(is.opt.double(detectionLimit))
+              assert(checkNull(detectionLimit),
+                     checkNumber(detectionLimit))
               private$.detectionLimit <- detectionLimit
             },
             dyeId = function(dyeId) {
               if (missing(dyeId))
                 return(private$.dyeId)
-              assert_that(is.type(dyeId,
-                                  idReferencesType))
+              assertClass(dyeId, "idReferencesType")
               private$.dyeId <- dyeId
             },
             sequences = function(sequences) {
               if (missing(sequences))
                 return(private$.sequences)
-              assert_that(is.opt.type(sequences,
-                                      sequencesType))
+              assert(checkNull(sequences),
+                     checkClass(sequences, "sequencesType"))
               private$.sequences <- sequences
             },
             commercialAssay = function(commercialAssay) {
               if (missing(commercialAssay))
                 return(private$.commercialAssay)
-              assert_that(is.opt.type(commercialAssay,
-                                      commercialAssayType))
+              assert(checkNull(commercialAssay),
+                     checkClass(commercialAssay, "commercialAssayType"))
               private$.commercialAssay <- commercialAssay
             }
           ))
 
 # # dpAmpCurveType ------------------------------------------------------------
-# dpAmpCurveType <- 
+# dpAmpCurveType <-
 #   R6Class("dpAmpCurveType",
 #           # class = FALSE,
 #           inherit = rdmlBaseType,
@@ -1553,9 +1625,10 @@ targetType <-
 #             initialize = function(cyc,
 #                                   tmp = NULL,
 #                                   fluor) {
-#               assert_that(is.float(cyc))
-#               assert_that(is.opt.double(tmp))
-#               assert_that(is.float(fluor))
+#               assertNumber(cyc)
+#               assert(checkNull(tmp),
+# checkNumber(tmp))
+#               assertNumber(fluor)
 #               private$.cyc <- cyc
 #               private$.tmp <- tmp
 #               private$.fluor <- fluor
@@ -1578,34 +1651,35 @@ targetType <-
 #             cyc = function(cyc) {
 #               if (missing(cyc))
 #                 return(private$.cyc)
-#               assert_that(is.float(cyc))
+#               assertNumber(cyc)
 #               private$.cyc <- cyc
 #             },
 #             tmp = function(tmp) {
 #               if (missing(tmp))
 #                 return(private$.tmp)
-#               assert_that(is.opt.double(tmp))
+#               assert(checkNull(tmp),
+# checkNumber(tmp))
 #               private$.tmp <- tmp
 #             },
 #             fluor = function(fluor) {
 #               if (missing(fluor))
 #                 return(private$.fluor)
-#               assert_that(is.float(fluor))
+#               assertNumber(fluor)
 #               private$.fluor <- fluor
 #             }
 #           ))
-# 
+#
 
 # # dpMeltingCurveType ------------------------------------------------------------
-# dpMeltingCurveType <- 
+# dpMeltingCurveType <-
 #   R6Class("dpMeltingCurveType",
 #           # class = FALSE,
 #           inherit = rdmlBaseType,
 #           public = list(
 #             initialize = function(tmp,
 #                                   fluor) {
-#               assert_that(is.float(tmp))
-#               assert_that(is.float(fluor))
+#               assertNumber(tmp)
+#               assertNumber(fluor)
 #               private$.tmp <- tmp
 #               private$.fluor <- fluor
 #             },
@@ -1623,13 +1697,13 @@ targetType <-
 #             tmp = function(tmp) {
 #               if (missing(tmp))
 #                 return(private$.tmp)
-#               assert_that(is.float(tmp))
+#               assertNumber(tmp)
 #               private$.tmp <- tmp
 #             },
 #             fluor = function(fluor) {
 #               if (missing(fluor))
 #                 return(private$.fluor)
-#               assert_that(is.float(fluor))
+#               assertNumber(fluor)
 #               private$.fluor <- fluor
 #             }
 #           ))
@@ -1637,62 +1711,79 @@ targetType <-
 # adpsType ------------------------------------------------------------
 
 #' adpsType R6 class.
-#' 
-#' Contains of amplification data points \code{matrix} -- single data points 
-#' measured during amplification. \code{Matrix} columns: \describe{ 
-#' \item{cyc}{(every point must be unique) Cycle - The PCR cycle at which data 
-#' point was collected.} \item{tmp}{(optional) Temperature - The temperature in 
-#' degrees Celsius at the time of measurement.} \item{fluor}{Fluorescence - The 
-#' fluorescence intensity measured without any correction. The fluorescence 
-#' intensity must not be baseline corrected.}} Inherits: 
+#'
+#' @details
+#' Contains \code{matrix} of amplification data. Must have three columns: \describe{
+#' \item{cyc}{PCR cycle at which data
+#' point was collected (every cycle must have unique number).}
+#' \item{tmp}{temperature in degrees Celsius at the time of measurement (optional).}
+#' \item{fluor}{raw fluorescence intensity measured.}} Inherits:
 #' \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{adpsType$new(fpoints)}
-#' 
-#' @section Fields: \describe{    
-#'   \item{\code{fpoints}}{\link[base]{matrix}. Matrix with amplification data
+#'
+#' @section Initialization: \preformatted{adpsType$new(fpoints)}
+#'
+#' @section Fields: \describe{
+#'   \item{\code{fpoints}}{\link[checkmate]{assertMatrix}. Matrix with amplification data
 #'   points.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-adpsType <- 
+#' @examples
+#' #cycles
+#' cyc <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+#' 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+#' 34, 35, 36, 37, 38, 39, 40)
+#' #fluorescence
+#' fluo <- c(2.0172, 2.0131, 2.0035, 2, 2.0024, 2.0056, 2.0105, 2.0179,
+#' 2.0272, 2.0488, 2.0922, 2.1925, 2.3937, 2.7499, 3.3072, 4.0966,
+#' 5.0637, 6.0621, 7.0239, 7.8457, 8.5449, 9.1282, 9.6022, 9.9995,
+#' 10.2657, 10.4989, 10.6813, 10.8209, 10.9158, 10.9668, 11.0053,
+#' 11.0318, 11.0446, 11.044, 11.0052, 10.9671, 10.9365, 10.9199,
+#' 10.897, 10.8316)
+#' #temperature
+#' temp <- c(55, 55, 55, 55, 54, 54, 55, 55, 55, 55, 55, 55, 55, 55, 55,
+#' 55, 55, 55, 55, 55, 55, 55, 55, 56, 55, 55, 55, 55, 55, 55, 55,
+#' 55, 55, 55, 55, 55, 55, 55, 55, 55)
+#'
+#' #combine all variables into a proper object
+#' data <- data.frame(cyc = cyc, tmp = temp, fluor = fluo)
+#'
+#' #create adps object
+#' adpsType$new(data)
+#'
+#' #create adps object without temperature data
+#' adpsType$new(data[, -2])
+adpsType <-
   R6Class("adpsType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(fpoints) {
-              assert_that(is.double.matrix(fpoints))
-              assert_that(has.only.names(fpoints,
-                                         c("cyc", "tmp", "fluor")))
-              private$.fpoints <- fpoints
+              assert(checkDataFrame(fpoints, types = c("numeric")))
+              assert(
+                length(setdiff(colnames(fpoints), c("cyc", "tmp", "fluor"))) == 0 ||
+                  length(setdiff(colnames(fpoints), c("cyc", "fluor"))) == 0)
+              private$.fpoints <- {
+                if (testDataTable(fpoints))
+                  fpoints
+                else
+                  data.table(fpoints)
+              }
             },
             .asXMLnodes = function(node.name) {
-              #               newXMLNode(
-              #                 name = node.name,
-              #                 .children = {
-              alply(private$.fpoints,
-                    1,
-                    function(fpoints.row) {
-                      newXMLNode(name = "adp",
-                                 .children = 
-                                   list(
-                                     newXMLNode(
-                                       name = "cyc",
-                                       text = fpoints.row["cyc"]),
-                                     {
-                                       if(!is.na(fpoints.row["tmp"]))
-                                         newXMLNode(
-                                           name = "tmp",
-                                           text = fpoints.row["tmp"])
-                                     },
-                                     newXMLNode(
-                                       name = "fluor",
-                                       text = fpoints.row["fluor"])
-                                   ))
-                    })
-              # })
+              ifelse("tmp" %in% colnames(private$.fpoints),
+                     return(
+                       private$.fpoints[, sprintf("<adp><cyc>%s</cyc><tmp>%s</tmp><fluor>%s</fluor></adp>",
+                                                  cyc, tmp, fluor)]%>>%
+                         paste0(collapse = "")
+                     ),
+                     return(
+                       private$.fpoints[, sprintf("<adp><cyc>%s</cyc><fluor>%s</fluor></adp>",
+                                                  cyc, fluor)]%>>%
+                         paste0(collapse = "")
+                     ))
             }
           ),
           private = list(
@@ -1702,59 +1793,62 @@ adpsType <-
             fpoints = function(fpoints) {
               if (missing(fpoints))
                 return(private$.fpoints)
-              assert_that(is.double.matrix(fpoints))
-              assert_that(has.only.names(fpoints,
-                                         c("cyc", "tmp", "fluor")))
-              private$.fpoints <- fpoints
+              assert(checkDataFrame(fpoints))
+              assert(
+                length(setdiff(colnames(fpoints), c("cyc", "tmp", "fluor"))) == 0 ||
+                  length(setdiff(colnames(fpoints), c("cyc", "fluor"))) == 0)
+              private$.fpoints <- {
+                if (testDataTable(fpoints))
+                  fpoints
+                else
+                  data.table(fpoints)
+              }
             }
           ))
 
 # mdpsType ------------------------------------------------------------
 
 #' mdpsType R6 class.
-#' 
-#' Contains of melting data points \code{matrix} -- single data points measured
-#' during amplification. \code{Matrix} columns: \describe{ \item{tmp}{(every
-#' point must be unique) Temperature - The temperature in degrees Celsius at the
-#' time of measurement.} \item{fluor}{Fluorescence - The fluorescence intensity 
-#' measured without any correction. The fluorescence intensity must not be 
-#' baseline corrected.}} Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{mdpsType$new(fpoints)}
-#'   
-#'   @section Fields: \describe{  
-#' \item{\code{fpoints}}{\link[base]{matrix}. Matrix with amplification data points.}
+#'
+#' Contains \code{matrix} of melting data points (single data points measured
+#' during amplification).
+#'
+#' Columns: \describe{
+#' \item{tmp}{(temperature in degrees Celsius at the time of measurement.
+#' Every point must have unique value.}
+#' \item{fluor}{fluorescence intensity measured without any correction
+#' (including baselining).}}
+#'
+#' Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{mdpsType$new(fpoints)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{fpoints}}{\link[checkmate]{assertMatrix}. Matrix with amplification data points.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-mdpsType <- 
+mdpsType <-
   R6Class("mdpsType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(fpoints) {
-              assert_that(is.double.matrix(fpoints))
-              assert_that(has.only.names(fpoints,
-                                         c("tmp", "fluor")))
-              private$.fpoints <- fpoints
+              assert(checkDataFrame(fpoints, types = c("numeric")))
+              assert(length(setdiff(colnames(fpoints), c("tmp", "fluor"))) == 0)
+              private$.fpoints <- {
+                if (testDataTable(fpoints))
+                  fpoints
+                else
+                  data.table(fpoints)
+              }
             },
             .asXMLnodes = function(node.name) {
-              alply(private$.fpoints,
-                    1,
-                    function(fpoints.row) {
-                      newXMLNode(name = "mdp",
-                                 .children = 
-                                   list(
-                                     newXMLNode(
-                                       name = "tmp",
-                                       text = fpoints.row["tmp"]),
-                                     newXMLNode(
-                                       name = "fluor",
-                                       text = fpoints.row["fluor"])
-                                   ))
-                    })
+              private$.fpoints[, sprintf("<mdp><tmp>%s</tmp><fluor>%s</fluor></mdp>",
+                                         tmp, fluor)] %>>%
+                paste0(collapse = "")
             }
           ),
           private = list(
@@ -1764,53 +1858,63 @@ mdpsType <-
             fpoints = function(fpoints) {
               if (missing(fpoints))
                 return(private$.fpoints)
-              assert_that(is.double.matrix(fpoints))
-              assert_that(has.only.names(fpoints,
-                                         c("tmp", "fluor")))
-              private$.fpoints <- fpoints
+              assert(checkDataFrame(fpoints))
+              assert(length(setdiff(colnames(fpoints), c("tmp", "fluor"))) == 0)
+              private$.fpoints <- {
+                if (testDataTable(fpoints))
+                  fpoints
+                else
+                  data.table(fpoints)
+              }
             }
           ))
 
 # dataType ------------------------------------------------------------
 
 #' dataType R6 class.
-#' 
+#'
 #' Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{dataType$new(tar, cq = NULL, excl = NULL, adp 
-#'   = NULL, mdp = NULL, endPt = NULL, bgFluor = NULL, bgFluorSlp = NULL, 
-#'   quantFluor = NULL)}
-#'   
-#' @section Fields: \describe{ \item{\code{tar}}{\link{idReferencesType}. 
-#'   TargetID - A reference to a target.} \item{\code{cq}}{\link[base]{double}. 
-#'   Quantification cycle - The calculated fractional PCR cycle used for 
-#'   downstream quantification. Negative values are used to express following 
-#'   conditions: Not Available: -1.0 } 
-#'   \item{\code{excl}}{\link[assertthat]{is.string}. Excluded - If present, 
-#'   this entry should not be evaluated. Do not set this element to false if 
-#'   this entry is valid, leave the entire element out instead. It may contain a
-#'   string with reason for exclusion. Several reasons for exclusion should be 
-#'   seperated by semicolons ";".} \item{\code{adp}}{\link{adpsType}.} 
-#'   \item{\code{mdp}}{\link{mdpsType}.} 
-#'   \item{\code{endPt}}{\link[base]{double}. End point - Result of an endpoint 
-#'   } measurement. \item{\code{bgFluor}}{\link[base]{double}. Background 
-#'   fluorescence - The y-intercept of the baseline trend based on the estimated
-#'   background fluorescence. } \item{\code{bgFluorSlp}}{\link[base]{double}. 
-#'   Background fluorescence slope - The slope of the baseline trend based on 
-#'   the estimated background fluorescence. The element should be absent to 
-#'   indicate a slope of 0.0; If this element is present without the bgFluor 
-#'   element it should be ignored. } 
-#'   \item{\code{quantFluor}}{\link[base]{double}. Quantification flourescence -
+#'
+#' @section Initialization: \preformatted{dataType$new(tar, cq = NULL, excl = NULL,
+#' adp = NULL, mdp = NULL, endPt = NULL, bgFluor = NULL, bgFluorSlp = NULL,
+#' quantFluor = NULL)}
+#'
+#' @section Fields: \describe{
+#' \item{\code{tar}}{\link{idReferencesType}.
+#'   TargetID - A reference to a target.}
+#'   \item{\code{cq}}{\link[checkmate]{checkNumber}.
+#'   Calculated fractional PCR cycle used for downstream quantification.
+#'   Negative values express following condition: Not Available: -1.0 }
+#'   \item{\code{excl}}{\link[checkmate]{checkString}. Excluded. If \code{excl}
+#'   is present, this entry should not be evaluated. Do not set this element
+#'   to \code{FALSE} if the entry is valid. Instead, leave the entire \code{excl}
+#'   element out instead. It may contain a string with a reason for the exclusion.
+#'   Several reasons for exclusion should be
+#'   seperated by semicolons ";".}
+#'   \item{\code{adp}}{\link{adpsType}.}
+#'   \item{\code{mdp}}{\link{mdpsType}.}
+#'   \item{\code{endPt}}{\link[checkmate]{checkNumber}}. Value of the endpoint measurement.
+#'   \item{\code{bgFluor}}{\link[checkmate]{checkNumber}. Background
+#'   fluorescence (the y-intercept of the baseline trend based on the estimated
+#'   background fluorescence). }
+#'   \item{\code{bgFluorSlp}}{\link[checkmate]{checkNumber}.
+#'   Background fluorescence slope - The slope of the baseline trend based on
+#'   the estimated background fluorescence. The element should be absent to
+#'   indicate a slope of 0.0; If this element is present without the \code{bgFluor}
+#'   element it should be ignored. }
+#'   \item{\code{quantFluor}}{\link[checkmate]{checkNumber}. Quantification flourescence -
 #'   The fluorescence value corresponding to the treshold line.} }
-#'   
-#' @section Methods: \describe{\item{\code{AsDataFrame(dp.type = 
-#'   "adp")}}{Represents amplification (\code{dp.type = "adp"}) or melting 
-#'   (\code{dp.type = "mdp"}) data points as \code{data.frame}}}
-#'   
+#'
+#' @section Methods: \describe{
+#' \item{\code{AsDataFrame(dp.type = "adp")}}{Represents amplification
+#' (\preformatted{dp.type = "adp"}) or melting (\code{dp.type = "mdp"}) data
+#' points as \code{data.frame}}
+#' }
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-dataType <- 
+dataType <-
   R6Class("dataType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -1824,40 +1928,42 @@ dataType <-
                                   bgFluor = NULL,
                                   bgFluorSlp = NULL,
                                   quantFluor = NULL) {
-              assert_that(is.type(tar,
-                                  idReferencesType))
-              assert_that(is.opt.double(cq))
-              assert_that(is.opt.string(excl))
-              #               assert_that(is.opt.list.type(adp,
-              #                                            dpAmpCurveType))
-              #               assert_that(is.opt.list.type(mdp,
-              #                                            dpMeltingCurveType))
-              assert_that(is.opt.type(adp,
-                                      adpsType))
-              assert_that(is.opt.type(mdp,
-                                      mdpsType))
-              assert_that(is.opt.double(endPt))
-              assert_that(is.opt.double(bgFluor))
-              assert_that(is.opt.double(bgFluorSlp))
-              assert_that(is.opt.double(quantFluor))
-              
+              assertClass(tar, "idReferencesType")
+              assert(checkNull(cq),
+                     checkNumber(cq))
+              assert(checkNull(excl),
+                     checkString(excl))
+              assert(checkNull(adp),
+                     checkClass(adp, "adpsType"))
+              assert(checkNull(mdp),
+                     checkClass(mdp, "mdpsType"))
+              assert(checkNull(endPt),
+                     checkNumber(endPt))
+              assert(checkNull(bgFluor),
+                     checkNumber(bgFluor))
+              assert(checkNull(bgFluorSlp),
+                     checkNumber(bgFluorSlp))
+              assert(checkNull(quantFluor),
+                     checkNumber(quantFluor))
+
               private$.tar <- tar
               private$.cq <- cq
               private$.excl <- excl
               private$.adp <- adp
               private$.mdp <- mdp
-              private$.endPt <- endPt 
+              private$.endPt <- endPt
               private$.bgFluor <- bgFluor
               private$.bgFluorSlp <- bgFluorSlp
               private$.quantFluor <- quantFluor
             },
-            AsDataFrame = function(dp.type = "adp") {
-              self[[dp.type]]$fpoints %>% 
-                as.data.frame %>% 
-                select(ifelse(dp.type == "adp",
-                              cyc,
-                              tmp),
-                       fluor)
+            GetFData = function(dp.type = "adp") {
+              assertString(dp.type)
+              out <- self[[dp.type]]
+              assert(checkClass(out, "adpsType"),
+                     checkClass(out, "mdpsType"))
+              ifelse(testClass(out, "adpsType"),
+                     return(out$fpoints[, .(cyc, fluor)]),
+                     return(out$fpoints[, .(tmp, fluor)]))
             }
           ),
           private = list(
@@ -1875,58 +1981,63 @@ dataType <-
             tar = function(tar) {
               if (missing(tar))
                 return(private$.tar)
-              assert_that(is.type(tar,
-                                  idReferencesType))
+              assertClass(tar, "idReferencesType")
               private$.tar <- tar
             },
             cq = function(cq) {
               if (missing(cq))
                 return(private$.cq)
-              assert_that(is.opt.double(cq))
+              assert(checkNull(cq),
+                     checkNumber(cq))
               private$.cq <- cq
             },
             excl = function(excl) {
               if (missing(excl))
                 return(private$.excl)
-              assert_that(is.opt.string(excl))
+              assert(checkNull(excl),
+                     checkString(excl))
               private$.excl <- excl
             },
             adp = function(adp) {
               if (missing(adp))
                 return(private$.adp)
-              assert_that(is.opt.type(adp,
-                                      adpsType))
+              assert(checkNull(adp),
+                     checkClass(adp, "adpsType"))
               private$.adp <- adp
             },
             mdp = function(mdp) {
               if (missing(mdp))
                 return(private$.mdp)
-              assert_that(is.opt.type(mdp,
-                                      mdpsType))
+              assert(checkNull(mdp),
+                     checkClass(mdp, "mdpsType"))
               private$.mdp <- mdp
             },
             endPt = function(endPt) {
               if (missing(endPt))
                 return(private$.endPt)
-              assert_that(is.opt.double(endPt))
+              assert(checkNull(endPt),
+                     checkNumber(endPt))
               private$.endPt <- endPt
             },
             bgFluor = function(bgFluor) {
               if (missing(bgFluor))
                 return(private$.bgFluor)
-              assert_that(is.opt.double(bgFluor))
+              assert(checkNull(bgFluor),
+                     checkNumber(bgFluor))
               private$.bgFluor <- bgFluor
             },
             bgFluorSlp = function(bgFluorSlp) {
               if (missing(bgFluorSlp))
                 return(private$.bgFluorSlp)
-              assert_that(is.opt.double(bgFluorSlp))
+              assert(checkNull(bgFluorSlp),
+                     checkNumber(bgFluorSlp))
               private$.bgFluorSlp <- bgFluorSlp
             },
             quantFluor = function(quantFluor) {
               if (missing(quantFluor))
                 return(private$.quantFluor)
-              assert_that(is.opt.double(quantFluor))
+              assert(checkNull(quantFluor),
+                     checkNumber(quantFluor))
               private$.quantFluor <- quantFluor
             }
           ))
@@ -1934,149 +2045,190 @@ dataType <-
 # reactType ------------------------------------------------------------
 
 #' reactType R6 class.
-#' 
+#'
 #' A reaction is an independent chemical reaction corresponding for example to a
-#' well in a 96 well plate, a capillary in a rotor, a through-hole on an array, 
+#' well in a 96 well plate, a capillary in a rotor, a through-hole on an array,
 #' etc. Inherits: \link{rdmlBaseType}.
-#' 
+#'
 #' The ID of this reaction
-#' 
+#'
 #' Schemas : \itemize{ \item rotor : assign IDs according to the position of the
-#' sample on the rotor (1 for the 1st sample, 2 for the 2nd, ...) \item plate 
-#' (96/384/1536 well) : the IDs are assigned in a row-first/column-second 
-#' manner. For each row, the samples are numbered according to the increasing 
-#' column number. At the end of a row, the numbering starts at the first column 
-#' of the next row. An example for this type of plate can be found below : 
+#' sample on the rotor (1 for the 1st sample, 2 for the 2nd, ...) \item plate
+#' (96/384/1536 well) : the IDs are assigned in a row-first/column-second
+#' manner. For each row, the samples are numbered according to the increasing
+#' column number. At the end of a row, the numbering starts at the first column
+#' of the next row. An example for this type of plate can be found below :
 #' \tabular{lllll}{ \tab 1  \tab 2  \tab 3 \tab ... \cr A   \tab 1  \tab 2  \tab
-#' 3 \tab     \cr B   \tab 13 \tab 14 \tab   \tab     \cr ... \tab    \tab \tab 
-#' \tab    } or \tabular{lllll}{ \tab 1  \tab 2  \tab 3 \tab ... \cr 1 \tab 1 
-#' \tab 2  \tab 3 \tab     \cr 2   \tab 13 \tab 14 \tab   \tab     \cr ... \tab 
+#' 3 \tab     \cr B   \tab 13 \tab 14 \tab   \tab     \cr ... \tab    \tab \tab
+#' \tab    } or \tabular{lllll}{ \tab 1  \tab 2  \tab 3 \tab ... \cr 1 \tab 1
+#' \tab 2  \tab 3 \tab     \cr 2   \tab 13 \tab 14 \tab   \tab     \cr ... \tab
 #' \tab    \tab   \tab    }
-#' 
-#' \item multi-array plate (BioTrove) : the IDs are assigned in a 
-#' row-first/column-second manner, ignoring the organisation of sub-arrays. For 
+#'
+#' \item multi-array plate (BioTrove) : the IDs are assigned in a
+#' row-first/column-second manner, ignoring the organisation of sub-arrays. For
 #' each row, the samples are numbered according to the increasing column number.
-#' At the end of a row, the the next row. An example for this type of plate can 
+#' At the end of a row, the the next row. An example for this type of plate can
 #' be found below : todo... }
-#' 
-#' @section Initialization: \code{reactType$new(id, sample, data = NULL)}
-#'   
+#'
+#' @section Initialization: \preformatted{reactType$new(id, sample, data = NULL, pcrFormat = pcrFormatType$new(8, 12, labelFormatType$new("123"), labelFormatType$new("ABC")))}
+#'
 #'   @section Fields: \describe{
-#'   \item{\code{id}}{\link{reactIdType}. See 'Details'.} 
+#'   \item{\code{id}}{\link{reactIdType}. See 'Details'.}
 #'   \item{\code{sample}}{\link{idReferencesType}. SampleID - A reference to a
-#'   sample.} 
+#'   sample.}
 #'   \item{\code{data}}{\code{list} of \link{dataType}.}
+#'   \item{\code{position}}{Human readable form of the \code{react id} (i.e. '13' -> 'B1')..}
 #'   }
-#'   
-#' @section Methods: \describe{\item{\code{AsDataFrame(dp.type = 
-#'   "adp")}}{Represents amplification (\code{dp.type = "adp"}) or melting 
-#'   (\code{dp.type = "mdp"}) data points of all targets as one 
-#'   \code{data.frame}} \item{\code{Position(pcrformat)}}{Converts \code{react 
-#'   id} to thew human readable form (i.e. '13' -> 'B1'). \code{pcrFormat} is 
-#'   \code{pcrFormatType}. Only for 'ABC' '123' format!}}
-#'   
+#'
+#' @section Methods: \describe{\item{\code{AsDataFrame(dp.type =
+#'   "adp")}}{Represents amplification (\code{dp.type = "adp"}) or melting
+#'   (\code{dp.type = "mdp"}) data points of all targets as one
+#'   \code{data.frame}} \item{\code{.recalcPosition(pcrformat)}}{Converts \code{react
+#'   id} to the human readable form (i.e. '13' -> 'B1'). This converted value can be
+#'   accessed by \code{position} field. \code{pcrFormat} is
+#'   \code{pcrFormatType}. Currently, only 'ABC' and '123' are supported as
+#'   labels. For '123' '123' the \code{Position} will look like 'r01c01', for
+#' 'ABC' '123' it will be 'A01' and for '123' 'ABC' it will be 01A. 'ABC' 'ABC'
+#' is not currently supported. Note that 'ABC' will result in loss of
+#' information if the experiment contains more than 26 rows!}}
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-reactType <- 
+reactType <-
   R6Class("reactType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(id,
                                   sample,
-                                  data = NULL) {
-              assert_that(is.type(id,
-                                  reactIdType))
-              assert_that(is.type(sample,
-                                  idReferencesType))
-              assert_that(is.opt.list.type(data,
-                                           dataType))
+                                  data = NULL,
+                                  pcrFormat =
+                                    pcrFormatType$new(8, 12,
+                                                      labelFormatType$new("ABC"),
+                                                      labelFormatType$new("123"))) {
+              assertClass(id, "reactIdType")
+              assertClass(sample, "idReferencesType")
+              assert(checkNull(data),
+                     checkList(data, "dataType"))
+              assert(checkNull(pcrFormat),
+                     checkClass(pcrFormat, "pcrFormatType"))
               private$.id <- id
               private$.sample <- sample
-              private$.data <- with.names(data,
-                                          quote(.$tar$id))
+              private$.data <- list.names(data,
+                                          .$tar$id)
+              if (!is.null(pcrFormat))
+                self$.recalcPosition(pcrFormat)
             },
-            AsDataFrame = function(dp.type = "adp",
+            GetFData = function(dp.type = "adp",
                                    long.table = FALSE) {
-              assert_that(is.string(dp.type))
+              assertString(dp.type)
+              assertFlag(long.table)
               out <-
-                private$.data %>% 
-                ldply(function(data)
-                  data$AsDataFrame(dp.type) %>% 
-                    cbind(tar = data$tar$id),
-                  .id = "tar")
-              
-              if (long.table == FALSE) out <- out %>% spread(tar,
-                                                             fluor) 
-              out
+                list.map(private$.data,
+                         data ~ {
+                           fdata <- data$GetFData(dp.type)
+                           set(fdata, ,
+                               "tar", data$tar$id)
+                           fdata
+                           }) %>>%
+                rbindlist()
+              ifelse(long.table,
+                     return(out),
+                     return(dcast(out,
+                                  as.formula(sprintf("%s ~ tar",
+                                                     colnames(out)[1])),
+                                  value.var = "fluor")))
             },
-            Position = function(pcrFormat) {
-              assert_that(is.type(pcrFormat,
-                                  pcrFormatType))
-              stopifnot(pcrFormat$rowLabel$value == "ABC",
-                        pcrFormat$columnLabel$value == "123")
-              sprintf("%s%02i",
-                      LETTERS[(private$.id$id - 1) %/% pcrFormat$columns + 1],
-                      as.integer((private$.id$id - 1) %% pcrFormat$columns + 1))
+            .recalcPosition = function(pcrFormat) {
+              assertClass(pcrFormat, "pcrFormatType")
+              private$calced.position <-
+                if (pcrFormat$rowLabel$value == "ABC" && pcrFormat$columnLabel$value == "123") {
+                  if (pcrFormat$rows > length(LETTERS)) {
+                    stop("Too many rows for 'ABC' format")
+                  } else {
+                    sprintf("%s%02i",
+                            LETTERS[(private$.id$id - 1) %/% pcrFormat$columns + 1],
+                            as.integer((private$.id$id - 1) %% pcrFormat$columns + 1))
+                  }
+                } else if (pcrFormat$columnLabel$value == "ABC" && pcrFormat$rowLabel$value == "123") {
+                  if (pcrFormat$columns > length(LETTERS)) {
+                    stop("Too many columns for 'ABC' format")
+                  } else {
+                    sprintf("%02i%s",
+                            as.integer((private$.id$id - 1) %/% pcrFormat$columns + 1),
+                            LETTERS[(private$.id$id - 1) %% pcrFormat$columns + 1])
+                  }
+                } else  if (pcrFormat$rowLabel$value == "123" && pcrFormat$columnLabel$value == "123") {
+                  sprintf("r%02ic%02i",
+                          as.integer((private$.id$id - 1) %/% pcrFormat$columns + 1),
+                          as.integer((private$.id$id - 1) %% pcrFormat$columns + 1))
+                } else {
+                  stop("Unsupported PCR format.")
+                }
             }
           ),
           private = list(
             .id = NULL,
             .sample = NULL,
-            .data = NULL
+            .data = NULL,
+            calced.position = NULL
           ),
           active = list(
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id,
-                                  reactIdType))
+              assertClass(id, "reactIdType")
               private$.id <- id
             },
             sample = function(sample) {
               if (missing(sample))
                 return(private$.sample)
-              assert_that(is.type(sample,
-                                  idReferencesType))
+              assertClass(sample, "idReferencesType")
               private$.sample <- sample
             },
             data = function(data) {
               if (missing(data))
                 return(private$.data)
-              assert_that(is.opt.list.type(data,
-                                           dataType))
-              private$.data <- with.names(data,
-                                          quote(.$tar$id))
+              assert(checkNull(data),
+                     checkList(data, "dataType"))
+              private$.data <- list.names(data,
+                                          .$tar$id)
+            },
+            position = function() {
+              private$calced.position
             }
           ))
 
 # dataCollectionSoftwareType ------------------------------------------------------------
 
 #' dataCollectionSoftwareType R6 class.
-#' 
-#' Software name and version used to collect and analyze the data.Inherits: 
-#' \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{dataCollectionSoftwareType$new(name, version)}
 #'
-#'   @section Fields: \describe{   
-#' \item{\code{name}}{\link[assertthat]{is.string}.}
-#' \item{\code{version}}{\link[assertthat]{is.string}.}
+#' Software name and version used to collect and analyze the data. Inherits:
+#' \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{dataCollectionSoftwareType$new(name, version)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{name}}{\link[checkmate]{checkString}.}
+#' \item{\code{version}}{\link[checkmate]{checkString}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-dataCollectionSoftwareType <- 
+#' @examples
+#' dataCollectionSoftwareType$new(name = "ExampleSoft",
+#'                                version = "1.0")
+dataCollectionSoftwareType <-
   R6Class("dataCollectionSoftwareType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(name,
                                   version) {
-              assert_that(is.string(name))
-              assert_that(is.string(version))
+              assertString(name)
+              assertString(version)
               private$.name <- name
               private$.version <- version
             }
@@ -2089,13 +2241,13 @@ dataCollectionSoftwareType <-
             name = function(name) {
               if (missing(name))
                 return(private$.name)
-              assert_that(is.string(name))
+              assertString(name)
               private$.name <- name
             },
             version = function(version) {
               if (missing(version))
                 return(private$.version)
-              assert_that(is.string(version))
+              assertString(version)
               private$.version <- version
             }
           ))
@@ -2103,27 +2255,27 @@ dataCollectionSoftwareType <-
 # cqDetectionMethodType ------------------------------------------------------------
 
 #' cqDetectionMethodType R6 class.
-#' 
+#'
 #' The method used to determine the Cq value.
 #' Can take values:
 #' \describe{
-#' \item{automated threshold and baseline settings}{}
-#' \item{manual threshold and baseline settings}{}
-#' \item{second derivative maximum}{}
-#' \item{other}{}
-#' }  
+#' \item{"automated threshold and baseline settings"}{}
+#' \item{"manual threshold and baseline settings"}{}
+#' \item{"second derivative maximum"}{}
+#' \item{"other"}{}
+#' }
 #' Inherits: \link{enumType}.
-#' 
-#' @section Initialization: \code{cqDetectionMethodType$new(value)}
-#'   
+#'
+#' @section Initialization: \preformatted{cqDetectionMethodType$new(value)}
+#'
 #'   @section Fields: \describe{
-#' \item{\code{value}}{\link[assertthat]{is.string}.}
+#' \item{\code{value}}{\link[checkmate]{checkString}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-cqDetectionMethodType <- 
+cqDetectionMethodType <-
   R6Class("cqDetectionMethodType",
           # class = FALSE,
           inherit = enumType,
@@ -2138,26 +2290,26 @@ cqDetectionMethodType <-
 # labelFormatType ------------------------------------------------------------
 
 #' labelFormatType R6 class.
-#' 
+#'
 #' Label used for \link{pcrFormatType}.
 #' Can take values:
 #' \describe{
 #' \item{ABC}{}
 #' \item{123}{}
 #' \item{A1a1}{}
-#' }  
+#' }
 #' Inherits: \link{enumType}.
-#' 
-#' @section Initialization: \code{labelFormatType$new(value)}
-#'   
+#'
+#' @section Initialization: \preformatted{labelFormatType$new(value)}
+#'
 #'   @section Fields: \describe{
-#' \item{\code{value}}{\link[assertthat]{is.string}.}
+#' \item{\code{value}}{\link[checkmate]{checkString}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-labelFormatType <- 
+labelFormatType <-
   R6Class("labelFormatType",
           # class = FALSE,
           inherit = enumType,
@@ -2171,41 +2323,40 @@ labelFormatType <-
 # pcrFormatType ------------------------------------------------------------
 
 #' pcrFormatType R6 class.
-#' 
-#' The format of the run - This allows the software to display the data 
-#' according to the qPCR instrument run format.Inherits: 
-#' \link{rdmlBaseType}.
-#' 
-#' Rotor formats always have 1 column; rows correspond to the number of places 
+#'
+#' The display format of the PCR, analogous to the the qPCR instrument run format.
+#' Inherits: \link{rdmlBaseType}.
+#'
+#' Rotor formats always have 1 column; rows correspond to the number of places
 #' in the rotor. Values for common formats are: \tabular{lllll}{ Format \tab
-#' rows \tab columns \tab rowLabel \tab columnLabel \cr single-well \tab 1   
+#' rows \tab columns \tab rowLabel \tab columnLabel \cr single-well \tab 1
 #' \tab 1       \tab 123      \tab 123         \cr 48-well plate \tab 6    \tab
-#' 8       \tab ABC      \tab 123         \cr 96-well plate \tab 8    \tab 12   
+#' 8       \tab ABC      \tab 123         \cr 96-well plate \tab 8    \tab 12
 #' \tab ABC      \tab 123         \cr 384-well plate \tab 16   \tab 24      \tab
 #' ABC      \tab 123         \cr 1536-well plate \tab 32   \tab 48      \tab ABC
-#' \tab 123         \cr 3072-well array \tab 32   \tab 96      \tab A1a1    
+#' \tab 123         \cr 3072-well array \tab 32   \tab 96      \tab A1a1
 #' \tab A1a1        \cr 5184-well chip \tab 72   \tab 72      \tab ABC      \tab
-#' 123         \cr 32-well rotor \tab 32   \tab 1       \tab 123      \tab 123  
+#' 123         \cr 32-well rotor \tab 32   \tab 1       \tab 123      \tab 123
 #' \cr 72-well rotor \tab 72   \tab 1       \tab 123      \tab 123         \cr
 #' 100-well rotor \tab 100  \tab 1       \tab 123      \tab 123         \cr free
-#' format \tab -1   \tab 1       \tab 123      \tab 123 } If rows are -1 then
-#' the software should not try to reconstruct a plate and just display all react
-#' data in list (1 column) form. If columns is 1 then the software should not
-#' display a column label.
-#' 
-#' @section Initialization: \code{pcrFormatType$new(rows, columns, rowLabel, columnLabel)}
-#'   
+#' format \tab -1   \tab 1       \tab 123      \tab 123 } If rows field has value -1,
+#' the function will not try to reconstruct a plate and just display all run
+#' data in a single column. If the columns field has value 1 then the function will
+#' not display a column label.
+#'
+#' @section Initialization: \preformatted{pcrFormatType$new(rows, columns, rowLabel, columnLabel)}
+#'
 #'   @section Fields: \describe{
-#' \item{\code{rows}}{\link[assertthat]{is.count}.}
-#' \item{\code{columns}}{\link[assertthat]{is.count}.}
+#' \item{\code{rows}}{\link[checkmate]{checkCount}.}
+#' \item{\code{columns}}{\link[checkmate]{checkCount}.}
 #' \item{\code{rowLabel}}{\link{labelFormatType}.}
 #' \item{\code{columnLabel}}{\link{labelFormatType}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-pcrFormatType <- 
+pcrFormatType <-
   R6Class("pcrFormatType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -2214,12 +2365,10 @@ pcrFormatType <-
                                   columns,
                                   rowLabel,
                                   columnLabel) {
-              assert_that(is.count(rows))
-              assert_that(is.count(columns))
-              assert_that(is.type(rowLabel,
-                                  labelFormatType))
-              assert_that(is.type(columnLabel,
-                                  labelFormatType))
+              assertCount(rows)
+              assertCount(columns)
+              assertClass(rowLabel, "labelFormatType")
+              assertClass(columnLabel, "labelFormatType")
               private$.rows <- rows
               private$.columns <- columns
               private$.rowLabel <- rowLabel
@@ -2236,27 +2385,25 @@ pcrFormatType <-
             rows = function(rows) {
               if (missing(rows))
                 return(private$.rows)
-              assert_that(is.count(rows))
+              assertCount(rows)
               private$.rows <- rows
             },
             columns = function(columns) {
               if (missing(columns))
                 return(private$.columns)
-              assert_that(is.count(columns))
+              assertCount(columns)
               private$.columns <- columns
             },
             rowLabel = function(rowLabel) {
               if (missing(rowLabel))
                 return(private$.rowLabel)
-              assert_that(is.type(rowLabel,
-                                  labelFormatType))
+              assertClass(rowLabel, "labelFormatType")
               private$.rowLabel <- rowLabel
             },
             columnLabel = function(columnLabel) {
               if (missing(columnLabel))
                 return(private$.columnLabel)
-              assert_that(is.type(columnLabel,
-                                  labelFormatType))
+              assertClass(columnLabel, "labelFormatType")
               private$.columnLabel <- columnLabel
             }
           ))
@@ -2264,41 +2411,44 @@ pcrFormatType <-
 # runType ------------------------------------------------------------
 
 #' runType R6 class.
-#' 
-#' A run is a set of reactions performed in one "run", for example one plate, 
-#' one rotor, one array, one chip.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{runType$new(id, description = NULL, 
-#'   documentation = NULL, experimenter = NULL, instrument = NULL, 
-#'   dataCollectionSoftware = NULL, backgroundDeterminationMethod = NULL, 
-#'   cqDetectionMethod = NULL, thermalCyclingConditions = NULL, pcrFormat, 
+#'
+#' A run is a set of reactions performed in one "run", for example one plate,
+#' one rotor, one array, one chip. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{runType$new(id, description = NULL,
+#'   documentation = NULL, experimenter = NULL, instrument = NULL,
+#'   dataCollectionSoftware = NULL, backgroundDeterminationMethod = NULL,
+#'   cqDetectionMethod = NULL, thermalCyclingConditions = NULL, pcrFormat,
 #'   runDate = NULL, react = NULL)}
-#'   
-#' @section Fields: \describe{ \item{\code{id}}{\link{idType}.} 
-#'   \item{\code{description}}{\link[assertthat]{is.string}.} 
-#'   \item{\code{documentation}}{\code{list} of \link{idReferencesType}.} 
-#'   \item{\code{experimenter}}{\code{list} of \link{idReferencesType}.} 
-#'   \item{\code{instrument}}{\link[assertthat]{is.string}. Description of the 
-#'   instrument used to aquire the data.} 
-#'   \item{\code{dataCollectionSoftware}}{\link{dataCollectionSoftwareType}. 
-#'   Description of the software used to analyze/collect the data.} 
-#'   \item{\code{backgroundDeterminationMethod}}{\link[base]{double}. 
-#'   Description of method used to determine the background. } 
-#'   \item{\code{cqDetectionMethod}}{\link[base]{double}. Description of method 
-#'   used to calculate the quantification cycle. } 
-#'   \item{\code{thermalCyclingConditions}}{\link[base]{double}. The program 
-#'   used to aquire the data.} \item{\code{pcrFormat}}{\link{adpsType}.} 
-#'   \item{\code{runDate}}{\link{adpsType}. Date and time stamp when the data 
-#'   was aquired.} \item{\code{react}}{\code{list} of \link{adpsType}.} }
-#'   
-#' @section Methods: \describe{\item{\code{AsDataFrame(dp.type = 
-#'   "adp")}}{Represents amplification (\code{dp.type = "adp"}) or melting 
-#'   (\code{dp.type = "mdp"}) data points as \code{data.frame}}}
-#'   
+#'
+#' @section Fields: \describe{
+#'  \item{\code{id}}{\link{idType}.}
+#'  \item{\code{description}}{\link[checkmate]{checkString}.}
+#'  \item{\code{documentation}}{\code{list} of \link{idReferencesType}.}
+#'  \item{\code{experimenter}}{\code{list} of \link{idReferencesType}.}
+#'  \item{\code{instrument}}{\link[checkmate]{checkString}. Description of the
+#'   instrument used to aquire the data.}
+#'  \item{\code{dataCollectionSoftware}}{\link{dataCollectionSoftwareType}.
+#'   Description of the software used to analyze/collect the data.}
+#'  \item{\code{backgroundDeterminationMethod}}{\link[checkmate]{checkString}.
+#'   Description of method used to determine the background. }
+#'  \item{\code{cqDetectionMethod}}{\link{cqDetectionMethodType}. Description of method
+#'   used to calculate the quantification cycle. }
+#'  \item{\code{thermalCyclingConditions}}{\link{idReferencesType}. The program
+#'   used to aquire the data.}
+#'  \item{\code{pcrFormat}}{\link{adpsType}.}
+#'  \item{\code{runDate}}{\link{adpsType}. Time stamp of data acquisition.}
+#'  \item{\code{react}}{\code{list} of \link{adpsType}.} }
+#'
+#' @section Methods: \describe{
+#'  \item{\code{AsDataFrame(dp.type = "adp")}}{Represents amplification
+#'  (\code{dp.type = "adp"}) or melting (\code{dp.type = "mdp"}) data
+#'  points as \code{data.frame}}}
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-runType <- 
+runType <-
   R6Class("runType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -2315,27 +2465,28 @@ runType <-
                                   pcrFormat,
                                   runDate = NULL,
                                   react = NULL) {
-              assert_that(is.type(id,
-                                  idType))
-              assert_that(is.opt.string(description))
-              assert_that(is.opt.list.type(documentation,
-                                       idReferencesType))
-              assert_that(is.opt.list.type(experimenter,
-                                       idReferencesType))
-              assert_that(is.opt.string(instrument))
-              assert_that(is.opt.type(dataCollectionSoftware,
-                                      dataCollectionSoftwareType))
-              assert_that(is.opt.string(backgroundDeterminationMethod))
-              assert_that(is.opt.type(cqDetectionMethod,
-                                      cqDetectionMethodType))
-              assert_that(is.opt.type(thermalCyclingConditions,
-                                      idReferencesType))
-              assert_that(is.type(pcrFormat,
-                                  pcrFormatType))
-              assert_that(is.opt.string(runDate)) # date time
-              assert_that(is.opt.list.type(react,
-                                       reactType))
-              
+              assertClass(id, "idType")
+              assert(checkNull(description),
+                     checkString(description))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
+              assert(checkNull(experimenter),
+                     checkList(experimenter, "idReferencesType"))
+              assert(checkNull(instrument),
+                     checkString(instrument))
+              assert(checkNull(dataCollectionSoftware),
+                     checkClass(dataCollectionSoftware, "dataCollectionSoftwareType"))
+              assert(checkNull(backgroundDeterminationMethod),
+                     checkString(backgroundDeterminationMethod))
+              assert(checkNull(cqDetectionMethod),
+                     checkClass(cqDetectionMethod, "cqDetectionMethodType"))
+              assert(checkNull(thermalCyclingConditions),
+                     checkClass(thermalCyclingConditions, "idReferencesType"))
+              assertClass(pcrFormat, "pcrFormatType")
+              assert(checkDateTime(runDate)) # date time
+              assert(checkNull(react),
+                     checkList(react, "reactType"))
+
               private$.id <- id
               private$.description <- description
               private$.documentation <- documentation
@@ -2347,36 +2498,40 @@ runType <-
               private$.thermalCyclingConditions <- thermalCyclingConditions
               private$.pcrFormat <- pcrFormat
               private$.runDate <- runDate
-              private$.react <- with.names(react,
-                                           quote(.$id$id))
+              private$.react <- list.names(react,
+                                           .$id$id)
+              self$UpdateReactsPosition()
             },
-            AsDataFrame = function(dp.type = "adp",
-                                   long.table = FALSE) {
-              assert_that(is.string(dp.type))
-              out <- 
-                private$.react %>% 
-                ldply(function(react)
-                  
-                  react$AsDataFrame(
-                    dp.type = dp.type,
-                    long.table = TRUE) %>% 
-                    cbind(.,
-                          sname = 
-                            sprintf("%s_%s",
-                                    react$id$id,
-                                    react$sample$id)
-                    ),
-                  .id = ifelse(dp.type == "adp",
-                               "cyc",
-                               "tmp"))
-              
-              if (long.table == FALSE) out <- out %>% 
-                tidyr::unite(sname_tar, sname, tar, sep = "_") %>% 
-                tidyr::spread(sname_tar, fluor) #%>% 
-              #                   arrange(ifelse(dp.type == "adp",
-              #                                  cyc,
-              #                                  tmp))
-              out
+            GetFData = function(dp.type = "adp",
+                                long.table = FALSE) {
+              assertString(dp.type)
+              assertFlag(long.table)
+
+              out <-
+                list.map(private$.react,
+                         react ~ {
+                           fdata <- react$GetFData(
+                             dp.type = dp.type,
+                             long.table = TRUE)
+                           set(fdata, ,
+                               c("react.id", "react.sample"),
+                               list(react$id$id,
+                                    react$sample$id))
+                           fdata
+                         }) %>>%
+                rbindlist()
+
+              ifelse(long.table == FALSE,
+                     return(dcast(out,
+                                  as.formula(sprintf("%s ~ react.id + react.sample + tar",
+                                                     colnames(out)[1])),
+                                  value.var = "fluor")),
+                     return(out)
+              )
+            },
+            UpdateReactsPosition = function() {
+              list.iter(self$react,
+                        react ~ react$.recalcPosition(self$pcrFormat))
             }
           ),
           private = list(
@@ -2397,113 +2552,115 @@ runType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id,
-                                  idType))
+              assertClass(id, "idType")
               private$.id <- id
             },
             description = function(description) {
               if (missing(description))
                 return(private$.description)
-              assert_that(is.opt.string(description))
+              assert(checkNull(description),
+                     checkString(description))
               private$.description <- description
             },
             documentation = function(documentation) {
               if (missing(documentation))
                 return(private$.documentation)
-              assert_that(is.opt.list.type(documentation,
-                                       idReferencesType))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
               private$.documentation <- documentation
             },
             experimenter = function(experimenter) {
               if (missing(experimenter))
                 return(private$.experimenter)
-              assert_that(is.opt.list.type(experimenter,
-                                       idReferencesType))
+              assert(checkNull(experimenter),
+                     checkList(experimenter, "idReferencesType"))
               private$.experimenter <- experimenter
             },
             instrument = function(instrument) {
               if (missing(instrument))
                 return(private$.instrument)
-              assert_that(is.opt.string(instrument))
+              assert(checkNull(instrument),
+                     checkString(instrument))
               private$.instrument <- instrument
             },
             dataCollectionSoftware = function(dataCollectionSoftware) {
               if (missing(dataCollectionSoftware))
                 return(private$.dataCollectionSoftware)
-              assert_that(is.opt.type(dataCollectionSoftware,
-                                      dataCollectionSoftwareType))
+              assert(checkNull(dataCollectionSoftware),
+                     checkClass(dataCollectionSoftware, "dataCollectionSoftwareType"))
               private$.dataCollectionSoftware <- dataCollectionSoftware
             },
             backgroundDeterminationMethod = function(backgroundDeterminationMethod) {
               if (missing(backgroundDeterminationMethod))
                 return(private$.backgroundDeterminationMethod)
-              assert_that(is.opt.string(backgroundDeterminationMethod))
+              assert(checkNull(backgroundDeterminationMethod),
+                     checkString(backgroundDeterminationMethod))
               private$.backgroundDeterminationMethod <- backgroundDeterminationMethod
             },
             cqDetectionMethod = function(cqDetectionMethod) {
               if (missing(cqDetectionMethod))
                 return(private$.cqDetectionMethod)
-              assert_that(is.opt.type(cqDetectionMethod,
-                                      cqDetectionMethodType))
+              assert(checkNull(cqDetectionMethod),
+                     checkClass(cqDetectionMethod, "cqDetectionMethodType"))
               private$.cqDetectionMethod <- cqDetectionMethod
             },
             thermalCyclingConditions = function(thermalCyclingConditions) {
               if (missing(thermalCyclingConditions))
                 return(private$.thermalCyclingConditions)
-              assert_that(is.opt.type(thermalCyclingConditions,
-                                      idReferencesType))
+              assert(checkNull(thermalCyclingConditions),
+                     checkClass(thermalCyclingConditions, "idReferencesType"))
               private$.thermalCyclingConditions <- thermalCyclingConditions
             },
             pcrFormat = function(pcrFormat) {
               if (missing(pcrFormat))
                 return(private$.pcrFormat)
-              assert_that(is.type(pcrFormat,
-                                  pcrFormatType))
+              assertClass(pcrFormat, "pcrFormatType")
               private$.pcrFormat <- pcrFormat
+              self$UpdateReactsPosition()
             },
             runDate = function(runDate) {
               if (missing(runDate))
                 return(private$.runDate)
-              assert_that(is.opt.string(runDate)) # date time
+              assert(checkDateTime(runDate)) # date time
               private$.runDate <- runDate
             },
             react = function(react) {
               if (missing(react))
                 return(private$.react)
-              assert_that(is.opt.list.type(react,
-                                       reactType))
-              private$.react <- with.names(react,
-                                           quote(.$id$id))
+              assert(checkNull(react),
+                     checkList(react, "reactType"))
+              private$.react <- list.names(react,
+                                           .$id$id)
             }
           ))
 
 # experimentType ------------------------------------------------------------
 
 #' experimentType R6 class.
-#' 
-#' An experiment can contain several runs (\link{runType}).Inherits: 
+#'
+#' A qPCR experiment. It may contain several runs (\link{runType}). Inherits:
 #' \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{experimentType$new(id, description = NULL,
+#'
+#' @section Initialization: \preformatted{experimentType$new(id, description = NULL,
 #'   documentation = NULL, run = NULL)}
 #'
-#'   @section Fields: \describe{   
+#'   @section Fields: \describe{
 #' \item{\code{id}}{\link{idType}.}
-#' \item{\code{description}}{\link[assertthat]{is.string}.}
+#' \item{\code{description}}{\link[checkmate]{checkString}.}
 #' \item{\code{documentation}}{\code{list} of \link{idReferencesType}.}
 #' \item{\code{run}}{\code{list} of \link{runType}.}
 #' }
-#'   
-#' @section Methods: \describe{\item{\code{AsDataFrame(dp.type = "adp", 
-#'   long.table = FALSE)}}{Represents amplification (\code{dp.type = "adp"}) or 
-#'   melting (\code{dp.type = "mdp"}) data points as \code{data.frame}. 
-#'   \code{long.table = TRUE} means that fluorescence data for all runs and 
+#'
+#' @section Methods: \describe{\item{\code{AsDataFrame(dp.type = "adp",
+#'   long.table = FALSE)}}{Represents amplification (\code{dp.type = "adp"}) or
+#'   melting (\code{dp.type = "mdp"}) data points as \code{data.frame}.
+#'   \code{long.table = TRUE} means that fluorescence data for all runs and
 #'   reacts will be at one collumn.}}
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-experimentType <- 
+experimentType <-
   R6Class("experimentType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -2512,39 +2669,44 @@ experimentType <-
                                   description = NULL,
                                   documentation = NULL,
                                   run = NULL) {
-              assert_that(is.type(id,
-                                  idType))
-              assert_that(is.opt.string(description))
-              assert_that(is.opt.list.type(documentation,
-                                           idReferencesType))
-              assert_that(is.opt.list.type(run,
-                                           runType))
-              
+              assertClass(id, "idType")
+              assert(checkNull(description),
+                     checkString(description))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
+              assert(checkNull(run),
+                     checkList(run, "runType"))
+
               private$.id <- id
               private$.description <- description
               private$.documentation <- documentation
-              private$.run <- with.names(run,
-                                         quote(.$id$id))
+              private$.run <- list.names(run,
+                                         .$id$id)
             },
-            AsDataFrame = function(dp.type = "adp",
-                                   long.table = FALSE) {
-              assert_that(is.string(dp.type))
-              assert_that(is.flag(long.table))
+            GetFData = function(dp.type = "adp",
+                                long.table = FALSE) {
+              assertString(dp.type)
+              assertFlag(long.table)
+
               out <-
-                private$.run %>% 
-                ldply(function(run)
-                  run$AsDataFrame(
-                    dp.type = dp.type,
-                    long.table = TRUE) %>% 
-                    cbind(.,  run = run$id$id,
-                          row.names = NULL),
-                  .id = ifelse(dp.type == "adp",
-                               "cyc",
-                               "tmp"))
-              if (long.table == FALSE) out <- out %>%
-                tidyr::unite(run_sname_tar, run, sname, tar, sep = "_") %>% 
-                tidyr::spread(run_sname_tar, fluor)
-              out
+                list.map(private$.run,
+                         run ~ {
+                           fdata <- run$GetFData(
+                             dp.type = dp.type,
+                             long.table = TRUE)
+                           set(fdata, ,
+                               "run", run$id$id)
+                           fdata
+                         }) %>>%
+                rbindlist()
+
+              ifelse(long.table == FALSE,
+                     return(dcast(out,
+                                  as.formula(sprintf("%s ~ react.id + react.sample + tar + run",
+                                                     colnames(out)[1])),
+                                  value.var = "fluor")),
+                     return(out)
+              )
             }
           ),
           private = list(
@@ -2557,82 +2719,82 @@ experimentType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id, idType))
+              assertClass(id, "idType")
               private$.id <- id
             },
             description = function(description) {
               if (missing(description))
                 return(private$.description)
-              assert_that(is.opt.string(description))
+              assert(checkNull(description),
+                     checkString(description))
               private$.description <- description
             },
             documentation = function(documentation) {
               if (missing(documentation))
                 return(private$.documentation)
-              assert_that(is.opt.list.type(documentation,
-                                           idReferencesType))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
               private$.documentation <- documentation
             },
             run = function(run) {
               if (missing(run))
                 return(private$.run)
-              assert_that(is.opt.list.type(run,
-                                           runType))
-              private$.run <- with.names(run,
-                                         quote(.$id$id))
+              assert(checkNull(run),
+                     checkList(run, "runType"))
+              private$.run <- list.names(run,
+                                         .$id$id)
             }
           ))
 
 # lidOpenType ------------------------------------------------------------
 
 #' lidOpenType R6 class.
-#' 
-#' This step waits for the user to open the lid and continues afterwards. It 
-#' allows to stop the program and to wait for the user to add for example 
-#' enzymes and continue the program afterwards. The temperature of the previous 
-#' step is maintained.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{lidOpenType$new()}
-#'   
-#'   
+#'
+#' This step waits for the user to open the lid and continues afterwards. It
+#' allows to stop the program and to wait for the user to add for example
+#' enzymes and continue the program afterwards. The temperature of the previous
+#' step is maintained. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{lidOpenType$new()}
+#'
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-lidOpenType <- 
+lidOpenType <-
   R6Class("lidOpenType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
-            initialize = function(lidOpen) {
+            initialize = function() {
             }
           ),
           private = list(
-            .lidOpen = NA
           ))
 
 # pauseType ------------------------------------------------------------
 
 #' pauseType R6 class.
-#' 
-#' This step allows to pause at a certain temperature. It is typically the last 
-#' step in an amplification protocol.Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{pauseType$new(temperature)}
-#'   
-#' @section Fields: \describe{ \item{\code{temperature}}{\link[base]{numeric}.
-#'   The temperature in degrees Celsius to maintain during the pause.}
+#'
+#' This step allows to pause at a certain temperature. It is typically the last
+#' step in an amplification protocol. Inherits: \link{rdmlBaseType}.
+#'
+#' @section Initialization: \preformatted{pauseType$new(temperature)}
+#'
+#' @section Fields: \describe{ \item{\code{temperature}}{\link[checkmate]{checkNumber}.
+#'   The temperature in degrees Celsius maintained during the pause.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-pauseType <- 
+pauseType <-
   R6Class("pauseType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(temperature) {
-              assert_that(is.float(temperature))
+              assertNumber(temperature)
               private$.temperature <- temperature
             }
           ),
@@ -2643,7 +2805,7 @@ pauseType <-
             temperature = function(temperature) {
               if (missing(temperature))
                 return(private$.temperature)
-              assert_that(is.float(temperature))
+              assertNumber(temperature)
               private$.temperature <- temperature
             }
           ))
@@ -2652,32 +2814,32 @@ pauseType <-
 # loopType ------------------------------------------------------------
 
 #' loopType R6 class.
-#' 
-#' This step allows to form a loop or to exclude some steps. It allows to jump 
-#' to a certain "goto" step for "repeat" times. If the "goto" step is higher 
-#' than the step of the loop, "repeat" must be "0".Inherits: 
+#'
+#' This step allows to form a loop or to exclude some steps. It allows to jump
+#' to a certain "goto" step for "repeat" times. If the "goto" step is outside of
+#' the loop range, it must have "repeat" value "0". Inherits:
 #' \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{loopType$new(goto, repeat.n)}
-#'   
-#' @section Fields: \describe{ \item{\code{goto}}{\link[base]{numeric}.  The
+#'
+#' @section Initialization: \preformatted{loopType$new(goto, repeat.n)}
+#'
+#' @section Fields: \describe{ \item{\code{goto}}{\link[checkmate]{assertCount}.  The
 #'   step to go to to form the loop.}
-#' \item{\code{repeat.n}}{\link[base]{numeric}. Determines how often the loop is 
-#'   repeated. The first run through the loop is counted as 0, the last loop is 
-#'   "repeat" - 1. The loop is run through exactly "repeat" times.}}
-#'   
+#' \item{\code{repeat.n}}{\link[checkmate]{assertCount}. Determines how many times the loop is
+#'   repeated. The first run through the loop is counted as 0, the last loop is
+#'   "repeat" - 1.}}
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-loopType <- 
+loopType <-
   R6Class("loopType",
           # class = FALSE,
           inherit = rdmlBaseType,
           public = list(
             initialize = function(goto,
                                   repeat.n) {
-              assert_that(is.count(goto))
-              assert_that(is.count(repeat.n))
+              assertCount(goto)
+              assertCount(repeat.n)
               private$.goto <- goto
               private$.repeat <- repeat.n
             }
@@ -2690,13 +2852,13 @@ loopType <-
             goto = function(goto) {
               if (missing(goto))
                 return(private$.goto)
-              assert_that(is.float(goto))
+              assertCount(goto)
               private$.goto <- goto
             },
             repeat.n = function(repeat.n) {
               if (missing(repeat.n))
                 return(private$.repeat)
-              assert_that(is.float(repeat.n))
+              assertCount(repeat.n)
               private$.repeat <- repeat.n
             }
           ))
@@ -2704,24 +2866,24 @@ loopType <-
 # measureType ------------------------------------------------------------
 
 #' measureType R6 class.
-#' 
+#'
 #' Can take values:
 #' \describe{
 #' \item{real time}{}
 #' \item{meltcurve}{}
-#' }  
-#' Inherits: \link{enumType}.
-#' 
-#' @section Initialization: \code{measureType$new(value)}
-#' 
-#'   @section Fields: \describe{ 
-#' \item{\code{value}}{\link[assertthat]{is.string}.}
 #' }
-#'   
+#' Inherits: \link{enumType}.
+#'
+#' @section Initialization: \preformatted{measureType$new(value)}
+#'
+#'   @section Fields: \describe{
+#' \item{\code{value}}{\link[checkmate]{checkString}.}
+#' }
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-measureType <- 
+measureType <-
   R6Class("measureType",
           # class = FALSE,
           inherit = enumType,
@@ -2734,30 +2896,32 @@ measureType <-
 # baseTemperatureType ------------------------------------------------------------
 
 #' baseTemperatureType R6 class.
-#' 
+#'
 #' Parent class for inner usage. Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{baseTemperatureType$new(duration, 
-#'   temperatureChange = NULL,  durationChange = NULL, measure = NULL, ramp = 
+#'
+#' @section Initialization: \preformatted{baseTemperatureType$new(duration,
+#'   temperatureChange = NULL, durationChange = NULL, measure = NULL, ramp =
 #'   NULL)}
-#'   
-#' @section Fields: \describe{ 
-#'   \item{\code{duration}}{\link[assertthat]{is.count}. The duration of this
-#'   step in } seconds. \item{\code{temperatureChange}}{\link[base]{double}. The
-#'   change of the temperature from one cycle to the next: actual temperature
+#'
+#' @section Fields: \describe{
+#'   \item{\code{duration}}{\link[checkmate]{checkCount}. Duration of this
+#'   step in seconds.}
+#'   \item{\code{temperatureChange}}{\link[checkmate]{checkNumber}. Change
+#'   of the temperature between two consecutive cycles: actual temperature
 #'   = temperature + (temperatureChange * cycle counter)}
-#'   \item{\code{durationChange}}{\link[assertthat]{is.count}. The change of the
-#'   duration from one cycle to the next: actual duration = duration +
-#'   (durationChange * cycle counter)} \item{\code{measure}}{\link{measureType}.
-#'   Indicates to make a measurement and store it as meltcurve or real-time
-#'   data.} \item{\code{ramp}}{\link[base]{double}. The allowed temperature
-#'   change from one step to the next in degrees Celsius per second. No value
-#'   means maximal change rate.}
+#'   \item{\code{durationChange}}{\link[checkmate]{checkCount}. Change of the
+#'   duration between two consecutive cycles: actual duration = duration +
+#'   (durationChange * cycle counter)}
+#'   \item{\code{measure}}{\link{measureType}. Indicates to make a measurement
+#'   and store it as meltcurve or real-time data.}
+#'   \item{\code{ramp}}{\link[checkmate]{checkNumber}. Allowed temperature
+#'   change between two consecutive cycles in degrees Celsius per second. If unstated,
+#'   the maximal change rate is assumed.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
-baseTemperatureType <- 
+baseTemperatureType <-
   R6Class("baseTemperatureType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -2767,13 +2931,16 @@ baseTemperatureType <-
                                   durationChange = NULL,
                                   measure = NULL,
                                   ramp = NULL) {
-              assert_that(is.count(duration))
-              assert_that(is.opt.double(temperatureChange))
-              assert_that(is.opt.count(durationChange))
-              assert_that(is.opt.type(measure,
-                                      measureType))
-              assert_that(is.opt.double(ramp))
-              
+              assertCount(duration)
+              assert(checkNull(temperatureChange),
+                     checkNumber(temperatureChange))
+              assert(checkNull(durationChange),
+                     checkCount(durationChange))
+              assert(checkNull(measure),
+                     checkClass(measure, "measureType"))
+              assert(checkNull(ramp),
+                     checkNumber(ramp))
+
               private$.duration <- duration
               private$.temperatureChange <- temperatureChange
               private$.durationChange <- durationChange
@@ -2792,32 +2959,35 @@ baseTemperatureType <-
             duration = function(duration) {
               if (missing(duration))
                 return(private$.duration)
-              assert_that(is.count(duration))
+              assertCount(duration)
               private$.duration <- duration
             },
             temperatureChange = function(temperatureChange) {
               if (missing(temperatureChange))
                 return(private$.temperatureChange)
-              assert_that(is.opt.double(temperatureChange))
+              assert(checkNull(temperatureChange),
+                     checkNumber(temperatureChange))
               private$.temperatureChange <- temperatureChange
             },
             durationChange = function(durationChange) {
               if (missing(durationChange))
                 return(private$.durationChange)
-              assert_that(is.opt.count(durationChange))
+              assert(checkNull(durationChange),
+                     checkCount(durationChange))
               private$.durationChange <- durationChange
             },
             measure = function(measure) {
               if (missing(measure))
                 return(private$.measure)
-              assert_that(is.opt.type(measure,
-                                      measureType))
+              assert(checkNull(measure),
+                     checkClass(measure, "measureType"))
               private$.measure <- measure
             },
             ramp = function(ramp) {
               if (missing(ramp))
                 return(private$.ramp)
-              assert_that(is.opt.double(ramp))
+              assert(checkNull(ramp),
+                     checkNumber(ramp))
               private$.ramp <- ramp
             }
           ))
@@ -2825,27 +2995,27 @@ baseTemperatureType <-
 # temperatureType ------------------------------------------------------------
 
 #' temperatureType R6 class.
-#' 
-#' This step keeps a constant temperature on the heat block. Inherits: 
+#'
+#' This step keeps a constant temperature on the heat block. Inherits:
 #' \link{baseTemperatureType}.
-#' 
-#' @section Initialization: \code{temperatureType$new(temperature, ...)}
-#'   
-#' @section Fields: \describe{ \item{\code{temperature}}{\link[base]{double}.
+#'
+#' @section Initialization: \preformatted{temperatureType$new(temperature, ...)}
+#'
+#' @section Fields: \describe{ \item{\code{temperature}}{\link[checkmate]{checkNumber}.
 #'   The temperature of the step in  degrees Celsius.}
 #' \item{\code{...}}{ Params of parent class \link{baseTemperatureType}.}
-#' } 
-#'   
+#' }
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-temperatureType <- 
+temperatureType <-
   R6Class("temperatureType",
           # class = FALSE,
           inherit = baseTemperatureType,
           public = list(
             initialize = function(temperature, ...) {
-              assert_that(is.float(temperature))
+              assertNumber(temperature)
               private$.temperature <- temperature
               super$initialize(...)
             }
@@ -2857,7 +3027,7 @@ temperatureType <-
             temperature = function(temperature) {
               if (missing(temperature))
                 return(private$.temperature)
-              assert_that(is.float(temperature))
+              assertNumber(temperature)
               private$.temperature <- temperature
             }
           ))
@@ -2865,24 +3035,24 @@ temperatureType <-
 # gradientType ------------------------------------------------------------
 
 #' gradientType R6 class.
-#' 
-#' This step forms a temperature gradient across the PCR block. Inherits: 
+#'
+#' Details of the temperature gradient across the PCR block. Inherits:
 #' \link{baseTemperatureType}.
-#' 
-#' @section Initialization: \code{gradientType$new(highTemperature, 
+#'
+#' @section Initialization: \preformatted{gradientType$new(highTemperature,
 #'   lowTemperature, ...)}
-#'   
-#' @section Fields: \describe{ 
-#'   \item{\code{highTemperature}}{\link[base]{double}. The high temperature of
-#'   thegradient in degrees Celsius.}
-#'   \item{\code{lowTemperature}}{\link[base]{double}. The low temperature of
+#'
+#' @section Fields: \describe{
+#'   \item{\code{highTemperature}}{\link[checkmate]{checkNumber}. The highest temperature of
+#'   the gradient in degrees Celsius.}
+#'   \item{\code{lowTemperature}}{\link[checkmate]{checkNumber}. The lowest temperature of
 #'   the gradient in degrees Celsius.}
 #' \item{\code{...}}{ Params of parent class \link{baseTemperatureType}. }}
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-gradientType <- 
+gradientType <-
   R6Class("gradientType",
           # class = FALSE,
           inherit = baseTemperatureType,
@@ -2890,8 +3060,8 @@ gradientType <-
             initialize = function(highTemperature,
                                   lowTemperature,
                                   ...) {
-              assert_that(is.float(highTemperature))
-              assert_that(is.float(lowTemperature))
+              assertNumber(highTemperature)
+              assertNumber(lowTemperature)
               private$.highTemperature <- highTemperature
               private$.lowTemperature <- lowTemperature
               super$initialize(...)
@@ -2905,13 +3075,13 @@ gradientType <-
             highTemperature = function(highTemperature) {
               if (missing(highTemperature))
                 return(private$.highTemperature)
-              assert_that(is.float(highTemperature))
+              assertNumber(highTemperature)
               private$.highTemperature <- highTemperature
             },
             lowTemperature = function(lowTemperature) {
               if (missing(lowTemperature))
                 return(private$.lowTemperature)
-              assert_that(is.float(lowTemperature))
+              assertNumber(lowTemperature)
               private$.lowTemperature <- lowTemperature
             }
           ))
@@ -2920,27 +3090,27 @@ gradientType <-
 # stepType ------------------------------------------------------------
 
 #' stepType R6 class.
-#' 
+#'
 #' Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{stepType$new(nr, description = NULL, 
-#'   temperature = NULL, gradient = NULL, loop = NULL, pause = NULL, lidOpen = 
+#'
+#' @section Initialization: \preformatted{stepType$new(nr, description = NULL,
+#'   temperature = NULL, gradient = NULL, loop = NULL, pause = NULL, lidOpen =
 #'   NULL)}
-#'   
-#' @section Fields: \describe{ \item{\code{nr}}{\link[assertthat]{is.count}. The
-#'   incremental number of the step. First step should be nr = 1 and then
-#'   increment each step by + 1. }
-#'   \item{\code{description}}{\link[assertthat]{is.string}.} 
-#'   \item{\code{temperature}}{\link{temperatureType}.} 
-#'   \item{\code{gradient}}{\link{gradientType}.} 
+#'
+#' @section Fields: \describe{ \item{\code{nr}}{\link[checkmate]{checkCount}. The
+#'   incremental number of the step. First step should have value 1. The increment
+#'   between steps should be constant and equivalent to 1.}
+#'   \item{\code{description}}{\link[checkmate]{checkString}.}
+#'   \item{\code{temperature}}{\link{temperatureType}.}
+#'   \item{\code{gradient}}{\link{gradientType}.}
 #'   \item{\code{loop}}{\link{loopType}.} \item{\code{pause}}{\link{pauseType}.}
 #'   \item{\code{lidOpen}}{\link{lidOpenType}.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-stepType <- 
+stepType <-
   R6Class("stepType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -2952,19 +3122,20 @@ stepType <-
                                   loop = NULL,
                                   pause = NULL,
                                   lidOpen = NULL) {
-              assert_that(is.count(nr))
-              assert_that(is.opt.string(description))
-              assert_that(is.opt.type(temperature,
-                                      temperatureType))
-              assert_that(is.opt.type(gradient,
-                                      gradientType))
-              assert_that(is.opt.type(loop,
-                                      loopType))
-              assert_that(is.opt.type(pause,
-                                      pauseType))
-              assert_that(is.opt.type(lidOpen,
-                                      lidOpenType))
-              
+              assertCount(nr)
+              assert(checkNull(description),
+                     checkString(description))
+              assert(checkNull(temperature),
+                     checkClass(temperature, "temperatureType"))
+              assert(checkNull(gradient),
+                     checkClass(gradient, "gradientType"))
+              assert(checkNull(loop),
+                     checkClass(loop, "loopType"))
+              assert(checkNull(pause),
+                     checkClass(pause, "pauseType"))
+              assert(checkNull(lidOpen),
+                     checkClass(lidOpen, "lidOpenType"))
+
               private$.nr <- nr
               private$.description <- description
               private$.temperature <- temperature
@@ -2987,48 +3158,49 @@ stepType <-
             nr = function(nr) {
               if (missing(nr))
                 return(private$.nr)
-              assert_that(is.count(nr))
+              assertCount(nr)
               private$.nr <- nr
             },
             description = function(description) {
               if (missing(description))
                 return(private$.description)
-              assert_that(is.opt.string(description))
+              assert(checkNull(description),
+                     checkString(description))
               private$.description <- description
             },
             temperature = function(temperature) {
               if (missing(temperature))
                 return(private$.temperature)
-              assert_that(is.opt.type(temperature,
-                                      temperatureType))
+              assert(checkNull(temperature),
+                     checkClass(temperature, "temperatureType"))
               private$.temperature <- temperature
             },
             gradient = function(gradient) {
               if (missing(gradient))
                 return(private$.gradient)
-              assert_that(is.opt.type(gradient,
-                                      gradientType))
+              assert(checkNull(gradient),
+                     checkClass(gradient, "gradientType"))
               private$.gradient <- gradient
             },
             loop = function(loop) {
               if (missing(loop))
                 return(private$.loop)
-              assert_that(is.opt.type(loop,
-                                      loopType))
+              assert(checkNull(loop),
+                     checkClass(loop, "loopType"))
               private$.loop <- loop
             },
             pause = function(pause) {
               if (missing(pause))
                 return(private$.pause)
-              assert_that(is.opt.type(pause,
-                                      pauseType))
+              assert(checkNull(pause),
+                     checkClass(pause, "pauseType"))
               private$.pause <- pause
             },
             lidOpen = function(lidOpen) {
               if (missing(lidOpen))
                 return(private$.lidOpen)
-              assert_that(is.opt.type(lidOpen,
-                                      lidOpenType))
+              assert(checkNull(lidOpen),
+                     checkClass(lidOpen, "lidOpenType"))
               private$.lidOpen <- lidOpen
             }
           ))
@@ -3036,28 +3208,28 @@ stepType <-
 # thermalCyclingConditionsType ------------------------------------------------------------
 
 #' thermalCyclingConditionsType R6 class.
-#' 
+#'
 #' A cycling program for PCR or to amplify cDNA. Inherits: \link{rdmlBaseType}.
-#' 
-#' @section Initialization: \code{thermalCyclingConditionsType$new(id, 
-#'   description = NULL, documentation = NULL, lidTemperature = NULL, 
+#'
+#' @section Initialization: \preformatted{thermalCyclingConditionsType$new(id,
+#'   description = NULL, documentation = NULL, lidTemperature = NULL,
 #'   experimenter = NULL, step)}
-#'   
-#' @section Fields: \describe{ \item{\code{id}}{\link{idType}.} 
-#'   \item{\code{description}}{\link[assertthat]{is.string}.} 
-#'   \item{\code{documentation}}{\code{list} of \link{idReferencesType}.} 
-#'   \item{\code{lidTemperature}}{\link[base]{double}. The temperature in
+#'
+#' @section Fields: \describe{ \item{\code{id}}{\link{idType}.}
+#'   \item{\code{description}}{\link[checkmate]{checkString}.}
+#'   \item{\code{documentation}}{\code{list} of \link{idReferencesType}.}
+#'   \item{\code{lidTemperature}}{\link[checkmate]{checkNumber}. The temperature in
 #'   degrees Celsius of the lid during cycling. }
 #'   \item{\code{experimenter}}{\code{list} of \link{idReferencesType}.
 #'   Reference to the person who made or uses this protocol. }
 #'   \item{\code{step}}{\code{list} of \link{stepType}. The steps a protocol
 #'   runs through to amplify DNA.}
 #'   }
-#'   
+#'
 #' @docType class
 #' @format An \code{\link{R6Class}} generator object.
 #' @export
-thermalCyclingConditionsType <- 
+thermalCyclingConditionsType <-
   R6Class("thermalCyclingConditionsType",
           # class = FALSE,
           inherit = rdmlBaseType,
@@ -3068,24 +3240,26 @@ thermalCyclingConditionsType <-
                                   lidTemperature = NULL,
                                   experimenter = NULL,
                                   step) {
-              assert_that(is.type(id,
-                                  idType))
-              assert_that(is.opt.string(description))
-              assert_that(is.opt.list.type(documentation,
-                                           idReferencesType))
-              assert_that(is.opt.double(lidTemperature))
-              assert_that(is.opt.list.type(experimenter,
-                                           idReferencesType))
-              assert_that(is.opt.list.type(step,
-                                           stepType))
-              
+              assertClass(id, "idType")
+              assert(checkNull(description),
+                     checkString(description))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
+              assert(checkNull(lidTemperature),
+                     checkNumber(lidTemperature))
+              assert(checkNull(experimenter),
+                     checkList(experimenter, "idReferencesType"))
+              assert(checkNull(step),
+                     checkList(step, "stepType"))
+
               private$.id <- id
               private$.description <- description
               private$.documentation <- documentation
               private$.lidTemperature <- lidTemperature
               private$.experimenter <- experimenter
-              private$.step <- step
-              
+              private$.step <- list.names(step,
+                                          .$nr)
+
             }
           ),
           private = list(
@@ -3100,40 +3274,43 @@ thermalCyclingConditionsType <-
             id = function(id) {
               if (missing(id))
                 return(private$.id)
-              assert_that(is.type(id, idType))
+              assertClass(id, "idType")
               private$.id <- id
             },
             description = function(description) {
               if (missing(description))
                 return(private$.description)
-              assert_that(is.opt.string(description))
+              assert(checkNull(description),
+                     checkString(description))
               private$.description <- description
             },
             documentation = function(documentation) {
               if (missing(documentation))
                 return(private$.documentation)
-              assert_that(is.opt.list.type(documentation,
-                                           idReferencesType))
+              assert(checkNull(documentation),
+                     checkList(documentation, "idReferencesType"))
               private$.documentation <- documentation
             },
             lidTemperature = function(lidTemperature) {
               if (missing(lidTemperature))
                 return(private$.lidTemperature)
-              assert_that(is.opt.double(lidTemperature))
+              assert(checkNull(lidTemperature),
+                     checkNumber(lidTemperature))
               private$.lidTemperature <- lidTemperature
             },
             experimenter = function(experimenter) {
               if (missing(experimenter))
                 return(private$.experimenter)
-              assert_that(is.opt.list.type(experimenter,
-                                           idReferencesType))
+              assert(checkNull(experimenter),
+                     checkList(experimenter, "idReferencesType"))
               private$.experimenter <- experimenter
             },
             step = function(step) {
               if (missing(step))
                 return(private$.step)
-              assert_that(is.opt.list.type(step,
-                                           idReferencesType))
-              private$.step <- step
+              assert(checkNull(step),
+                     checkList(step, "stepType"))
+              private$.step <- list.names(step,
+                                          .$nr)
             }
           ))

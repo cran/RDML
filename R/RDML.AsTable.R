@@ -1,31 +1,34 @@
 #' Represents fields of \code{RDML} object as \code{data.frame}
-#' 
-#' Represents specified fields of \code{RDML} object as \code{data.frame} to 
-#' overview, filter or pass them to \code{GetFData} and \code{SetFData} 
+#'
+#' Formats particular fields of \code{RDML} object as \code{data.frame}s,
+#' filters or passes them to \code{\link{RDML.GetFData}} and \code{RDML.SetFData}
 #' functions.
-#' 
-#' By default input this function forms \code{data.frame} with such columns: 
-#' \describe{ \item{exp.id}{experiment$id} \item{run.id}{run$id} 
-#' \item{react.id}{react$id} 
-#' \item{position}{react$position} 
+#'
+#' By default input this function forms \code{data.frame} with following columns:
+#' \describe{ \item{exp.id}{experiment$id} \item{run.id}{run$id}
+#' \item{react.id}{react$id}
+#' \item{position}{react$position}
 #' \item{sample}{react$sample}
-#' \item{target}{data$id} \item{target.dyeId}{target[[data$id]]$dyeId} 
-#' \item{sample.type}{sample[[react$sample]]$type} } You can overload default 
-#' columns list by parameter \code{.default} but note that columns \code{exp.id,
-#' run.id, react.id, target} are necessary for usage \code{AsTable} output as 
-#' input for \code{GetFData} and \code{SetFData}. \cr Additional columns can be 
-#' introduced by specifying them at input parameter \code{...} (see Examples). 
-#' All default and additional columns accession expressions have to be 
-#' named!!!\cr
-#' 
+#' \item{target}{data$tar$id} \item{target.dyeId}{target[[data$id]]$dyeId}
+#' \item{sample.type}{sample[[react$sample]]$type} } You can overload default
+#' columns list by parameter \code{.default} but note that columns
+#' \preformatted{exp.id, run.id, react.id, target} are necessary for usage
+#' \code{AsTable} output as
+#' input for \code{GetFData} and \code{SetFData}. \cr Additional columns can be
+#' introduced by specifying them at input parameter \code{...} (see Examples).
+#' All default and additional columns accession expressions must be named.
+#'
 #' Experiment, run, react and data to which belongs each fluorescence data vector
 #' can be accessed by \code{experiment, run, react, data} (see Examples).
-#' 
+#'
+#' Result table does not contain data from experiments with ids starting with '.'!
+#'
 #' @param .default \code{list} of default columns
 #' @param name.pattern expression to form \code{fdata.name} (see Examples)
+#' @param add.columns \code{list} of additional columns
 #' @param ... additional columns
-#' @author Konstantin A. Blagodatskikh <k.blag@@yandex.ru>, Stefan Roediger 
-#'   <stefan.roediger@@b-tu.de>, Michal Burdukiewicz 
+#' @author Konstantin A. Blagodatskikh <k.blag@@yandex.ru>, Stefan Roediger
+#'   <stefan.roediger@@b-tu.de>, Michal Burdukiewicz
 #'   <michalburdukiewicz@@gmail.com>
 #' @keywords manip
 #' @docType methods
@@ -41,17 +44,17 @@
 #' filename <- paste(PATH, "/extdata/", "stepone_std.rdml", sep ="")
 #' stepone <- RDML$new(filename)
 #' ## Mark fluorescense data which Cq > 30 and add quantities to
-#' ## AsTable output. 
-#' ## Names for fluorescense data will contain sample name and react 
+#' ## AsTable output.
+#' ## Names for fluorescense data will contain sample name and react
 #' ## positions
 #' tab <- stepone$AsTable(
 #'          name.pattern = paste(react$sample$id, react$position),
-#'          cq30 = if(data$cq >= 30) ">=30" else "<30",
-#'          quantity = as.factor(sample[[react$sample$id]]$quantity$value)
+#'          add.columns = list(cq30 = if(data$cq >= 30) ">=30" else "<30",
+#'          quantity = as.factor(sample[[react$sample$id]]$quantity$value))
 #'          )
 #' ## Show cq30 and quantities
 #' tab[c("cq30", "quantity")]
-#' ## Get fluorescence values for 'std' type samples 
+#' ## Get fluorescence values for 'std' type samples
 #' ## in format ready for ggplot function
 #' library(dplyr)
 #' fdata <- stepone$GetFData(
@@ -71,7 +74,7 @@ RDML$set("public", "AsTable",
              exp.id = experiment$id$id,
              run.id = run$id$id,
              react.id = react$id$id,
-             position = react$Position(run$pcrFormat),
+             position = react$position,
              sample = react$sample$id,
              target = data$tar$id,
              target.dyeId = target[[data$tar$id]]$dyeId$id,
@@ -79,11 +82,12 @@ RDML$set("public", "AsTable",
              adp = !is.null(data$adp),
              mdp = !is.null(data$mdp)),
            name.pattern = paste(
-             react$Position(run$pcrFormat),
+             react$position,
              react$sample$id,
              private$.sample[[react$sample$id]]$type$value,
              data$tar$id,
-             sep = "_"),                    
+             sep = "_"),
+           add.columns = list(),
            ...) {
            # create short names
            dateMade <- private$.dateMade
@@ -97,24 +101,58 @@ RDML$set("public", "AsTable",
            thermalCyclingConditions <- private$.thermalCyclingConditions
            # dilutions <- private$.dilutions
            # conditions <- private$.conditions
-           
-           out<-data.frame()
-           for(experiment in private$.experiment) {                      
-             for(run in experiment$run) {                                    
-               for(react in run$react) {                          
-                 for(data in react$data){
-                   out<-rbind(out,
-                              data.frame(
-                                eval(substitute(list(
-                                  .default,
-                                  ...))),
-                                row.names = eval(substitute(name.pattern)),
-                                stringsAsFactors = FALSE
-                              ))
+
+           nrows <- 0
+           for (experiment in private$.experiment) {
+             if (!grepl("^\\.", experiment$id$id)) {
+               for (run in experiment$run) {
+                 for (react in run$react) {
+                   for (data in react$data){
+                     nrows <- nrows + 1
+                   }
                  }
                }
              }
            }
-           cbind(fdata.name = rownames(out), out, stringsAsFactors = FALSE)
-         }, 
+           out <- data.table(fdata.name = as.character(1:nrows))
+           i <- 0L
+           for (experiment in private$.experiment) {
+             if (!grepl("^\\.", experiment$id$id)) {
+               for (run in experiment$run) {
+                 for (react in run$react) {
+                   for (data in react$data) {
+                     i <- i + 1L
+                     result <- c(
+                       fdata.name = eval(substitute(name.pattern)),
+                       eval(substitute(.default)),
+                       eval(substitute(add.columns)),
+                       eval(substitute(list(...))))
+                     list.iter(
+                       names(result),
+                       name ~ {
+                         if (!is.null(result[[name]])) {
+                           tryCatch(
+                             set(out, i, name,
+                                 result[[name]]),
+                             warning = function(w) {
+                               if (str_detect(w, "Coerced")) {
+                                 stop(sprintf("Name: %s  Result: %s\n%s",
+                                              name, as.character(result[[name]]), w))
+                               }
+                               warning(w)
+                             }
+                           )
+                         }
+                       })
+                   }
+                 }
+               }
+             }
+           }
+           setkey(out, "fdata.name")
+           if (length(unique(out$fdata.name)) != length(out$fdata.name)) {
+             warning("fdata.name column has duplicates! Try another name.pattern.")
+           }
+           out
+         },
          overwrite = TRUE)

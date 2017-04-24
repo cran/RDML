@@ -2,8 +2,18 @@ library(shiny)
 library(RDML)
 library(dplyr)
 library(tools)
+library(pipeR)
+library(chipPCR)
+library(MBmca)
+library(dpcR)
+library(data.table)
+library(ggplot2)
+library(plotly)
+library(rlist)
+library(whisker)
+library(stringr)
 
-
+source("rdml.extensions.R")
 
 testEmptyInput <- function(val) {
   if(is.null(val) || is.na(val) || val == "")
@@ -49,7 +59,8 @@ shinyServer(function(input, output, session) {
                            sep = ".")
           file.rename(input$rdmlFiles$datapath[i],
                       newpath)
-          values$RDMLs[[input$rdmlFiles$name[i]]] <-
+          values$RDMLs[[paste0(file_path_sans_ext(input$rdmlFiles$name[i]),
+                               format(Sys.time(), "@%H%M%S"))]] <-
             RDML$new(newpath)
           incProgress(1,
                       message = {
@@ -72,7 +83,7 @@ shinyServer(function(input, output, session) {
       updateSelectizeInput(session,
                            "rdmlFileSlct",
                            choices = names(values$RDMLs),
-                           selected = input$rdmlFileSlct)
+                           selected = tail(names(values$RDMLs), 1))
     })
   })
   
@@ -109,47 +120,6 @@ shinyServer(function(input, output, session) {
     })
   })
   
-  # create from tables
-  observe({
-    if (is.null(input$fromTables) || length(input$fromTables$name) != 2)
-      return(NULL)
-    isolate({
-      withProgress({
-        tables <- lapply(input$fromTables$datapath,
-                         function(x) read.csv(x,
-                                              stringsAsFactors = FALSE))
-        description.index <- 
-          sapply(tables,
-                 function(t) {
-                   if (length(intersect(
-                     c("fdata.name",
-                       "exp.id",
-                       "run.id",
-                       "react.id",
-                       "sample",
-                       "target",
-                       "target.dyeId"), colnames(t))) == 7)
-                     TRUE
-                   else
-                     FALSE })
-        description <- tables[[which(description.index == TRUE)]]
-        fdata <- tables[[which(description.index == FALSE)]]
-        newRDML <- RDML$new()
-        newRDML$SetFData(fdata,
-                         description)
-        values$RDMLs <- c(newRDML,
-                          values$RDMLs)
-        name <- input$fromTables$name[which(description.index == TRUE)]
-        names(values$RDMLs)[1] <- name
-        #         updateSelectInput("rdmlFileSlc",
-        #                           selected = name)
-      },
-      min = 0,
-      max = 1,
-      message = "Processing Tables..."
-      )
-    })
-  })
   
   # merge RDMLs
   observe({
@@ -196,14 +166,17 @@ shinyServer(function(input, output, session) {
     })
   })
   
-  # update RDML
+  # create subversion RDML
   observe({
-    input$updateRDMLBtn
+    input$createSubversionRDMLBtn
     isolate({
       if (is.null(values$rdml))
         return(NULL)
-      values$RDMLs[[input$rdmlFileSlct]] <- values$rdml$clone(deep = TRUE)
-      rdmml <<- values$RDMLs[[input$rdmlFileSlct]]
+      values$rdml$dateUpdated <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+      new.name <- str_replace(input$rdmlFileSlct,
+                              "@.*$",
+                              format(Sys.time(), "@%H%M%S"))
+      values$RDMLs[[new.name]] <- values$rdml$clone(deep = TRUE)
     })
   })
   
@@ -654,8 +627,8 @@ shinyServer(function(input, output, session) {
                           "sampleCsmTccSlct",
                           selected = sample$cdnaSynthesisMethod$thermalCyclingConditions)
         updateTextInput(session,
-                            "sampleTemplateQuantityConcText",
-                            value = sample$templateQuantity$conc)
+                        "sampleTemplateQuantityConcText",
+                        value = sample$templateQuantity$conc)
         updateSelectInput(session,
                           "sampleTemplateQuantityNucleotideSlct",
                           selected = sample$templateQuantity$nucleotide$value)
@@ -2076,94 +2049,612 @@ shinyServer(function(input, output, session) {
     })
   })
   
+  # Calculations ------------------------------------------------------------
+  preprocessAdpDone <- reactive({
+    if (is.null(values$rdml))
+      return(NULL)
+    # cat("Calculations\n")
+    tbl <- values$rdml$AsTable()[adp == TRUE]
+    if (nrow(tbl) == 0){
+      return(runif(1))
+    }
+    smooth <- TRUE
+    smooth.method <- input$smoothqPCRmethod
+    if (input$smoothqPCRmethod == "none") {
+      smooth <- FALSE
+      smooth.method <- "savgol"
+    }
+    if (input$preprocessqPCR) {
+      tbl[adp == TRUE,
+          {
+            values$rdml$experiment[[exp.id]]$
+              run[[run.id]]$
+              react[[as.character(react.id)]]$
+              data[[target]]$PreprocessAdp(smooth,
+                                           smooth.method,
+                                           input$normqPCRmethod)
+          }, by = fdata.name]
+    } else {
+      tbl[adp == TRUE,
+          {
+            values$rdml$experiment[[exp.id]]$
+              run[[run.id]]$
+              react[[as.character(react.id)]]$
+              data[[target]]$UndoPreprocessAdp()
+          }, by = fdata.name]
+    }
+    exp.ids <- unique(tbl$exp.id)
+    updateSelectInput(session,
+                      "showqPCRExperiment",
+                      choices = exp.ids,
+                      selected = exp.ids[1])
+    runif(1)
+  })
+  
+  observe({
+    req(input$showqPCRExperiment)
+    run.ids <- unique(values$rdml$AsTable()[exp.id == input$showqPCRExperiment, run.id])
+    updateSelectInput(session,
+                      "showqPCRRun",
+                      choices = run.ids,
+                      selected = run.ids[1])
+  })
+  
+  output$thLevelsUI <- renderUI({
+    if (is.null(values$rdml))
+      return(NULL)
+    scale.text <- ifelse(input$logScale,
+                         " (log scale)",
+                         "")
+    isolate({
+      tbl <- values$rdml$AsTable()
+      wellPanel(
+        list.map(unique(tbl$target),
+                 target ~ {
+                   th.name <- paste0("thLevel_", target)
+                   if (is.null(input[[th.name]])) {
+                     numericInput(paste0("thLevel_", target),
+                                  HTML(sprintf("Threshold <b>%s</b>%s", target, scale.text)),
+                                  value = 0,
+                                  step = 0.01)
+                   } else {
+                     numericInput(th.name,
+                                  HTML(sprintf("Threshold <b>%s</b>%s", target, scale.text)),
+                                  value = ifelse(input$logScale,
+                                                 {
+                                                   converted <- log10(input[[th.name]])
+                                                   ifelse(converted == -Inf,
+                                                          0, converted)
+                                                 },
+                                                 10 ^ input[[th.name]]),
+                                  step = 0.01)
+                   }
+                 })
+      )
+    })
+  })
+  
+  cqCalcsDone <- reactive({
+    req(preprocessAdpDone())
+    tbl <- values$rdml$AsTable()[adp == TRUE]
+    if (nrow(tbl) == 0){
+      return(runif(1))
+    }
+    tbl[adp == TRUE,
+        {
+          values$rdml$experiment[[exp.id]]$
+            run[[run.id]]$
+            react[[as.character(react.id)]]$
+            data[[target]]$CalcCq(input$cqMethod,
+                                  ifelse(input$logScale,
+                                         10^input[[paste0("thLevel_", target)]],
+                                         input[[paste0("thLevel_", target)]]),
+                                  input$autoThLevel)
+        }, by = fdata.name]
+  })
+  
+  preprocessMdpDone <- reactive({
+    if (is.null(values$rdml))
+      return(NULL)
+    # cat("Calculations MDP\n")
+    tbl <- values$rdml$AsTable()[mdp == TRUE]
+    if (nrow(tbl) == 0){
+      return(runif(1))
+    }
+    if (input$preprocessMelting) {
+      tbl[mdp == TRUE,
+          {
+            values$rdml$experiment[[exp.id]]$
+              run[[run.id]]$
+              react[[as.character(react.id)]]$
+              data[[target]]$PreprocessMdp(input$bgAdjMelting,
+                                           input$bgRangeMelting,
+                                           input$minMaxMelting,
+                                           input$dfFactMelting)
+          }, by = fdata.name]
+    } else {
+      tbl[mdp == TRUE,
+          {
+            values$rdml$experiment[[exp.id]]$
+              run[[run.id]]$
+              react[[as.character(react.id)]]$
+              data[[target]]$UndoPreprocessMdp()
+          }, by = fdata.name]
+    }
+    exp.ids <- unique(tbl$exp.id)
+    updateSelectInput(session,
+                      "showMeltingExperiment",
+                      choices = exp.ids,
+                      selected = exp.ids[1])
+    runif(1)
+  })
+  
+  observe({
+    req(input$showMeltingExperiment)
+    run.ids <- unique(values$rdml$AsTable()[exp.id == input$showMeltingExperiment, run.id])
+    updateSelectInput(session,
+                      "showMeltingRun",
+                      choices = run.ids,
+                      selected = run.ids[1])
+  })
   # Curves and table --------------------------------------------------------
   
   rdmlTable <- reactive({
-    if (is.null(values$rdml) || !(input$mainNavbar %in% c("adp",
-                                                          "mdp")))
+    # if (is.null(values$rdml) || !(input$mainNavbar %in% c("adp","mdp")))
+    if (is.null(cqCalcsDone()) || 
+        is.null(preprocessMdpDone()) ||
+        !(input$mainNavbar %in% c("adp","mdp")))
       return(NULL)
     # updLog("Create rdmlTable")
-    tbl <- values$rdml$AsTable() %>% 
-      filter_(paste(input$mainNavbar, "TRUE", sep = "==")) %>% 
-      select(-c(adp, mdp))
-    if (nrow(tbl) == 0) {
-      return(NULL)
-    }
-    tbl
+    input$showqPCRExperiment
+    input$showqPCRRun
+    input$showMeltingExperiment
+    input$showMeltingRun
+    # cat("Create rdmlTable")
+    isolate({
+      tbl <- values$rdml$AsTable(
+        add.columns = list(
+          cq = {
+            cq <- data$cq
+            if (is.null(cq))
+              as.numeric(NA)
+            else
+              cq
+          },
+          quantFluor = {
+            quantFluor <- data$quantFluor
+            if (is.null(quantFluor)) {
+              if (is.null(cq)) {
+                as.numeric(NA)
+              } else {
+                0
+              }
+            } else {
+              quantFluor
+            }
+          })
+      )[get(input$mainNavbar) == TRUE &
+          exp.id == input$showqPCRExperiment &
+          run.id == input$showqPCRRun, !c("adp", "mdp")][
+            , c("cq.mean", "cq.sd", "quantFluor.mean") := list(
+              mean(cq, na.rm = TRUE),
+              sd(cq, na.rm = TRUE),
+              mean(quantFluor, na.rm = TRUE)
+            ),
+            by = .(sample, target)]
+      if (nrow(tbl) == 0) {
+        return(NULL)
+      }
+      values$lockReplot <- 0
+      values$selectedTubes <-
+        data.frame(position = tbl$position %>>% unique(),
+                   selected = FALSE,
+                   stringsAsFactors = FALSE) %>>%
+        mutate(row = str_extract(position, "[A-Z]") %>>% factor(levels = rev(LETTERS[1:values$rdml$experiment[[input$showqPCRExperiment]]$
+                                                                                       run[[input$showqPCRRun]]$pcrFormat$rows])),
+               column = str_extract(position, "[0-9]+") %>>% as.numeric() %>>% as.character())
+      rownames(values$selectedTubes) <- values$selectedTubes$position
+      targets <- unique(tbl$target)
+      updateSelectInput(session,
+                        paste0("showTargets", input$mainNavbar),
+                        choices = targets,
+                        selected = targets)
+      tbl
+    })
+  })
+  
+  # plate
+  plateHTML <- reactive({
+    req(rdmlTable())
+    # cat("Redraw plate\n")
+    isolate({
+      tbl <- rdmlTable()
+      tbl[1, 1] <- tbl[1, 1]
+      cell.template <- paste0("<td id='tube_{{position}}'",
+                              "title='{{position}}\u000A{{sample}}' ",
+                              "class='{{class}}' ",
+                              "style='background-color:rgba({{bgcolor}}, 0.35)'>")#,
+      #"{{snamef}}</td>")
+      descr <- tbl %>>%
+        group_by(position) %>>%
+        summarise_each(funs(first)) %>>%
+        # left_join(calc.Cqs(c("tr"), values$preprocessed$tr %>>% names),
+        #           by = "position") %>>%
+        left_join(values$selectedTubes
+                  , by = "position") %>>%
+        group_by(fdata.name) %>>%
+        mutate(snamef = format.smpl.name(sample, 5),
+               class = paste(ifelse(selected,
+                                    "sel",
+                                    "")),
+               bgcolor = "red") %>>%
+        as.data.frame()
+      rownames(descr) <- descr$position
+      pcr.format <- values$rdml$experiment[[input$showqPCRExperiment]]$
+        run[[input$showqPCRRun]]$pcrFormat
+      sprintf(paste0('<table id="plateTable" class="plateTable"><thead>',
+                     '<tr><th id="toggleall" class="br-triangle"></th>%s</tr></thead>',
+                     '<tbody>%s</tbody></table>',
+                     '<script>addCellOnClick();</script>'),
+              list.map(1:pcr.format$columns, col ~ sprintf("<th id='col_%02i'>%s</th>", col, col)) %>>%
+                paste(collapse = ""),
+              list.map(LETTERS[1:pcr.format$rows],
+                       row ~ sprintf("<tr><th id='row_%s' class='%s'>%s</th>%s</tr>", row,
+                                     {
+                                       if (as.integer(charToRaw(row)) %% 2 == 0) "even-row"
+                                       else "odd-row"
+                                     },
+                                     row,
+                                     list.map(1:pcr.format$columns,
+                                              col ~ {
+                                                tube <- sprintf("%s%02i", row, col)
+                                                if (is.na(descr[tube, "fdata.name"]))
+                                                  return("<td></td>")
+                                                paste0(
+                                                  whisker.render(cell.template,
+                                                                 descr[tube, ]),
+                                                  descr[tube, "snamef"],
+                                                  "</td>"
+                                                )
+                                              }) %>>%
+                                       paste(collapse = ""))
+              ) %>>%
+                paste(collapse = "")) %>>%
+        HTML
+    })
+  })
+  
+  output$plateTbl <- renderUI({
+    req(plateHTML())
+    plateHTML()
+  })
+  
+  output$plateTblMelting <- renderUI({
+    req(plateHTML())
+    plateHTML()
+  })
+  
+  # plate click
+  observe({
+    req(input$cellClick)
+    isolate({
+      values$lockReplot <- values$lockReplot + 1
+      # row <- input$cellClick[2]
+      # col <- input$cellClick[3]
+      id <- str_split(input$cellClick[2], "_")[[1]]
+      dblclick <- ifelse(input$cellClick[3] == "dblclick",
+                         TRUE, FALSE)
+      ctrl <- ifelse(input$cellClick[4] == "ctrl",
+                     TRUE, FALSE)
+      toggle <- function(action, positions) {
+        for (position in positions) {
+          action(paste("tube", position, sep = "_"), "sel", NULL)
+        }
+      }
+      selectPositions <- function(positions) {
+        if (length(positions) == 0)
+          return(NULL)
+        selected <- values$selectedTubes
+        if (dblclick) {
+          selected$selected <- FALSE
+          toggle(removeClass, values$selectedTubes$position)
+        }
+        if (all(values$selectedTubes[positions, "selected"] == TRUE)) {
+          selected[positions, "selected"] <- FALSE
+          toggle(removeClass, positions)
+        } else {
+          selected[positions, "selected"] <- TRUE
+          toggle(addClass, positions)
+        }
+        values$selectedTubes <- selected
+      }
+      switch(id[1],
+             "tube" = {
+               positions <- {
+                 if (ctrl) {
+                   descr <- rdmlTable()
+                   smpl <- descr[descr$position == id[2], sample]
+                   target <- descr[descr$position == id[2], target]
+                   descr[descr$sample == smpl & descr$target == target, position]
+                 } else {
+                   id[2]
+                 }}
+               selectPositions(positions)
+             },
+             "toggleall" = {
+               if (all(values$selectedTubes$selected == TRUE) || dblclick) {
+                 values$selectedTubes$selected <- FALSE
+                 toggle(removeClass, values$selectedTubes$position)
+               } else {
+                 values$selectedTubes$selected <- TRUE
+                 toggle(addClass, values$selectedTubes$position)
+               }
+             },
+             "col" = {
+               positions <- str_extract(values$selectedTubes$position,
+                                        paste0("[A-Z]",
+                                               id[2])) %>>%
+                 na.omit
+               selectPositions(positions)
+             },
+             "row" = {
+               positions <- str_extract(values$selectedTubes$position,
+                                        paste0(id[2],
+                                               "[0-9]+")) %>>%
+                 na.omit()
+               selectPositions(positions)
+             },
+             {})
+      values$lockReplot <- values$lockReplot - 1
+    })
+  })
+  
+  # filter qPCRDt
+  observe({
+    req(values$selectedTubes)
+    positions <- values$selectedTubes %>>%
+      filter(selected == TRUE) %>>%
+      (position)
+    if (length(positions) == 0)
+      positions <- values$selectedTubes$position
+    js$filterTblByPositions(
+      paste(positions, collapse = "|"))
   })
   
   fdata <- reactive({
-    if (is.null(rdmlTable())) 
-      return(NULL)
+    req(rdmlTable())
     # updLog("Create fdata")
     tbl <- rdmlTable()
-    if (!is.null(input$selectedRows)) {
-      tbl <- 
-        filter(tbl,
-               fdata.name %in% input$selectedRows[
-                 seq(1, length(input$selectedRows), by = 9)])
+    fdata <- values$rdml$GetFData(tbl, 
+                                  dp.type = input$mainNavbar,
+                                  long.table = TRUE)
+    if (input$mainNavbar == "mdp"){
+      fdata[
+        , fluor.deriv := {
+          diff <- diffQ(data.frame(tmp, fluor), verbose = TRUE, warn = FALSE)$xy
+          c(head(diff, 1)[1, 2], diff[, 2], tail(diff, 1)[1, 2])
+        }, by = fdata.name]
     }
-    values$rdml$GetFData(tbl, 
-                         dp.type = input$mainNavbar,
-                         long.table = TRUE)
+    fdata
   })
   
-  # qPCR
-  observe({
-    if (is.null(fdata()) || input$mainNavbar == "mdp")
+  fdata.filtered <- reactive({
+    req(fdata())
+    if (values$lockReplot != 0)
       return(NULL)
-    # updLog("Plot qPCR\n")
-    fdt <- fdata()
-    ggvis(fdata(), ~cyc, ~fluor) %>%
-      group_by(fdata.name) %>%
-      layer_paths() %>% 
-      bind_shiny("qPCRPlot")
+    fd <- fdata()[target %in% input[[paste0("showTargets", input$mainNavbar)]]]
+    if (!all(values$selectedTubes$selected == FALSE)) {
+      fd <- fd[
+        position %in% values$selectedTubes$position[values$selectedTubes$selected == TRUE]]
+    }
+    if (nrow(fd) == 0)
+      return(NULL)
+    fd
+  })
+  
+  output$qPCRPlot <- renderPlotly({
+    if (is.null(fdata.filtered()) || input$mainNavbar == "mdp")
+      return(NULL)
+    
+    fpoints <- fdata.filtered()
+    # just to copy in memory to new table
+    fpoints[1, 1] <- fpoints[1, 1]
+    # plot ticks setup
+    if (input$cqMethod == "th" && !input$autoThLevel) {
+      fpoints[, th := as.numeric(input[[paste0("thLevel_", target)]])
+                # ifelse(input$logScale,
+                #              {
+                #                new.fluor <- log10(input[[paste0("thLevel_", target)]])
+                #                ifelse(is.nan(new.fluor) | new.fluor == -Inf,
+                #                       0,
+                #                       new.fluor)},
+                             # input[[paste0("thLevel_", target)]]
+                       # )
+              , by = target]
+    }
+    if (input$logScale) {
+      fpoints[, c("fluor", "quantFluor", "quantFluor.mean") := 
+                list(
+                  {
+                    new.fluor <- log10(fluor)
+                    ifelse(is.nan(new.fluor) | new.fluor == -Inf,
+                           NA,
+                           new.fluor)},
+                  {
+                    new.fluor <- log10(quantFluor)
+                    ifelse(is.nan(new.fluor) | new.fluor == -Inf,
+                           0,
+                           new.fluor)},
+                  {
+                    new.fluor <- log10(quantFluor.mean)
+                    ifelse(is.nan(new.fluor) | new.fluor == -Inf,
+                           0,
+                           new.fluor)}
+                )]
+    }
+    
+    
+    p <- 
+      ggplot(fpoints) +
+      geom_line(aes_string(x = "cyc", y = "fluor",
+                           group = "fdata.name",
+                           color = {
+                             if (input$colorqPCRby == "none")
+                               NULL
+                             else
+                               input$colorqPCRby
+                           },
+                           linetype = {
+                             if (input$shapeqPCRby == "none")
+                               NULL
+                             else
+                               input$shapeqPCRby
+                           }),
+                size = 0.5) +
+      switch(input$showCq,
+             none = NULL,
+             yes = geom_point(aes_string(x = "cq", y = "quantFluor",
+                                         group = "fdata.name",
+                                         color = {
+                                           if (input$colorqPCRby == "none")
+                                             NULL
+                                           else
+                                             input$colorqPCRby
+                                         },
+                                         shape = {
+                                           if (input$shapeqPCRby == "none")
+                                             NULL
+                                           else
+                                             input$shapeqPCRby
+                                         }),
+                              size = 2),
+             mean = geom_point(aes_string(x = "cq.mean", y = "quantFluor.mean",
+                                          group = "fdata.name",
+                                          color = {
+                                            if (input$colorqPCRby == "none")
+                                              NULL
+                                            else
+                                              input$colorqPCRby
+                                          },
+                                          shape = {
+                                            if (input$shapeqPCRby == "none")
+                                              NULL
+                                            else
+                                              input$shapeqPCRby
+                                          }
+             ),
+             size = 2)) +
+             {
+               if (input$cqMethod == "th" && !input$autoThLevel) {
+                 geom_hline(aes_string(
+                   yintercept = "th",
+                   group = "target",
+                   color = {
+                     if (input$colorqPCRby == "none")
+                       NULL
+                     else
+                       input$colorqPCRby
+                   },
+                   linetype = {
+                     if (input$shapeqPCRby == "none")
+                       NULL
+                     else
+                       input$shapeqPCRby
+                   }))
+               } else {
+                 NULL
+               }
+             } +
+      labs(x = "Cycles", y = "RFU",
+           color = NULL, linetype = NULL, fill = NULL) +
+      theme_bw() +
+      # scale_x_continuous(minor_breaks = seq(1, max.cyc, 1),
+      #                    limits = c(1, max.cyc)) +
+      # scale_y_continuous(breaks = ticks,
+      #                    minor_breaks = minor.ticks) +
+      theme(legend.position = "right",
+            legend.box = "horizontal",
+            panel.grid.minor = element_line(size = 1)) 
+    # Not available with plotly
+    # + 
+    # {
+    #   if (input$logScale) {
+    #     annotation_logticks()
+    #   } else {
+    #     NULL
+    #   }
+    # }
+    
+    p
   })
   
   output$qPCRDt <- renderDataTable({
     if (is.null(rdmlTable())) 
       return(NULL)
-    rdmlTable()
-  },
-  callback = "function(table) {
-    table.on('click.dt', 'tr', function() {
-    $(this).toggleClass('selected');
-    Shiny.onInputChange('selectedRows',
-    table.rows('.selected').data().toArray());
-    });
-    }"
+    # input$recalculateCq
+    # isolate({
+    tbl <- rdmlTable()[, !"quantFluor.mean"]
+    names(tbl)[1] <- "data.name"
+    tbl
+  }
+  # ,
+  # callback = "function(table) {
+  #   table.on('click.dt', 'tr', function() {
+  #   $(this).toggleClass('selected');
+  #   Shiny.onInputChange('selectedRows',
+  #   table.rows('.selected').data().toArray());
+  #   });
+  #   }"
   )
   
   # melting
-  observe({
-    if (is.null(fdata()) || input$mainNavbar == "adp")
+  output$meltingPlot <- renderPlotly({
+    if (is.null(fdata.filtered()) || input$mainNavbar == "adp")
       return(NULL)
-    # updLog("Plot Melting\n")
-    ggvis(fdata(), ~tmp, ~fluor) %>%
-      group_by(fdata.name) %>%
-      layer_paths() %>% 
-      bind_shiny("meltingPlot")
+    p <- plot_ly(data = fdata.filtered() %>>% group_by(fdata.name),
+                 x = ~tmp,
+                 color = {
+                   if (input$colorMeltingBy == "none")
+                     ""
+                   else
+                     fdata.filtered()[, get(input$colorMeltingBy)]
+                 },
+                 linetype = {
+                   if (input$shapeMeltingBy == "none")
+                     NULL
+                   else
+                     fdata.filtered()[, get(input$shapeMeltingBy)]
+                 })
+    subplot(
+      add_lines(p,
+                y = ~fluor),
+      add_lines(p,
+                y = ~fluor.deriv),
+      shareX = TRUE
+    )
   })
   
   output$meltingDt <- renderDataTable({
     if (is.null(rdmlTable())) 
       return(NULL)
-    rdmlTable()
-  },
-  callback = "function(table) {
-    table.on('click.dt', 'tr', function() {
-    $(this).toggleClass('selected');
-    Shiny.onInputChange('selectedRows',
-    table.rows('.selected').data().toArray());
-    });
-    }"
+    tbl <- rdmlTable()[, !c("quantFluor", "quantFluor.mean", "cq", "cq.mean", "cq.sd")]
+    names(tbl)[1] <- "data.name"
+    tbl
+  }
+  # ,callback = "function(table) {
+  #   table.on('click.dt', 'tr', function() {
+  #   $(this).toggleClass('selected');
+  #   Shiny.onInputChange('selectedRows',
+  #   table.rows('.selected').data().toArray());
+  #   });
+  #   }"
   )
   
   # Download ----------------------------------------------------------------
   
   output$downloadRDML <- downloadHandler(
     filename = function() {
-      input$rdmlFileSlct
+      paste0(input$rdmlFileSlct, ".rdml")
     },
     content = function(file) {
       output <- values$rdml$AsXML(file)
@@ -2187,10 +2678,4 @@ shinyServer(function(input, output, session) {
   })
   
 })
-
-
-
-
-
-
 

@@ -287,7 +287,7 @@ RDML$set("public", "ProcessVideoScan",
              # R&ouml;diger et al. (2015) Bioinformatics for preprocessed data.
              # The diffQ2 function from the MBmca package 
              # (R&ouml;diger et al. (2013), The R Journal) was used to calculate the
-             # Cq values of each amplificaion curve.
+             # Cq values of each amplification curve.
              cq <- diffQ2(dat_CPP, inder = TRUE)[["xTm1.2.D2"]][1]
              self$experiment[[tab[i - 1, "exp.id"]]]$
                run[[tab[i - 1, "run.id"]]]$
@@ -314,12 +314,12 @@ description <- data.frame(
 # Create an empty RDML object
 video.scan <- RDML$new()
 
-# Add fluorescence data and metadata to the RDML object from a given source
-# Fare the sake of easyness we use the C54 dataset from the chipPCR package.
+# Add fluorescence data and metadata to the RDML object from a given source.
+# For the sake of simplicity we use the C54 dataset from the chipPCR package.
 video.scan$SetFData(C54, description)
 
 ## ------------------------------------------------------------------------
-# Add experimentator information
+# Add experimentalist information
 video.scan$experimenter <- 
   list(
     experimenterType$new(
@@ -426,7 +426,7 @@ video.scan$experiment$exp1$description <-
         "the 1 HCU (see Roediger et al. 2013 for details). A 20 micro L PCR reaction",
         "was composed of 250 nM primer (forward and reverse), 1x Maxima Probe qPCR",
         "Master Mix (Fermentas), 1 micro L template (MLC-2v amplification product in",
-        "different dilutions), 50 nM hydrolysis probe probe for MLC-2v and A.",
+        "different dilutions), 50 nM hydrolysis probe for MLC-2v and A.",
         "bidest. During the amplification, fluorescence was measured at 59.5 degree",
         "Celsius. The Cy5 channel was used to monitor the MLC-2v specific hydrolysis",
         "probe. Input stock cDNA was used undiluted (D1). D2 was 1/1000 and D3",
@@ -444,12 +444,12 @@ video.scan$ProcessVideoScan(last.cycle = c(35, 45, 55),
                                            NULL))
 
 ## ---- results = "hide", fig.width = 6, fig.height = 4--------------------
-# Visualise RDML object
+# Visualize RDML object
 video.scan$AsDendrogram()
 
 ## ---- results = "hide", fig.width = 6, fig.height = 4--------------------
 ## Visualise preprocessed data with Cq values as vertical dashed lines
-# Add custom column that contains calculated Cq
+# Add custom column that contains the calculated Cq
 tab <- video.scan$AsTable(cq = {
                  cq <- data$cq
                  if (is.null(cq) || is.na(cq))

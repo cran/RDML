@@ -15,6 +15,35 @@ checkDateTime <- function(dateTime){
   return("Must pass lubridate ymd_hms() or ymd() conversion")
 }
 
+# returns list with unique elements (names) with warning
+filterDuplicated <- function(elements) {
+  if (anyDuplicated(elements)) {
+    warning(sprintf("Duplicate %s removed", substitute(elements)))
+    elements[!duplicated(elements)]
+  } else {
+    elements
+  }
+}
+
+#' Extract data points from \code{RDML} object
+#' 
+#' Extract data points from \code{RDML} object as.data.frame.
+#' 
+#' @param x \code{RDML} object.
+#' @param i,j indices.
+#' @param dp.type Type of fluorescence data (i.e. 'adp' for qPCR or 'mdp' for
+#'   melting).
+#' 
+#' @docType methods
+#' @keywords manip
+#' @docType methods
+#' @name [.GetFData
+#' @rdname extractdatapoints-method
+#' @export
+"[.RDML" <- function(x, i, j, dp.type = "adp") {
+  as.data.frame(x$GetFData(x$AsTable(), dp.type = dp.type))[i, j]
+}
+
 # rdmlBaseType ------------------------------------------------------------
 
 #' Base R6 class for RDML package.
@@ -1694,6 +1723,11 @@ adpsType <-
                 else
                   data.table(fpoints)
               }
+              # check for duplicate cycles. Occures in StepOne RDML files.
+              if (anyDuplicated(private$.fpoints) != FALSE) {
+                private$.fpoints <- unique(private$.fpoints)
+                warning("Duplicate cycles removed")
+              }
               setkey(private$.fpoints, cyc)
             }
           ))
@@ -1750,6 +1784,11 @@ mdpsType <-
                   fpoints
                 else
                   data.table(fpoints)
+              }
+              # check for duplicate temperatures. Occures in StepOne RDML files.
+              if (anyDuplicated(private$.fpoints) != FALSE) {
+                private$.fpoints <- unique(private$.fpoints)
+                warning("Duplicate temperatures removed")
               }
               setkey(private$.fpoints, tmp)
             }
@@ -2464,6 +2503,11 @@ runType <-
                      checkList(react, "reactType"))
               private$.react <- list.names(react,
                                            .$id$id)
+              # check for duplicate reacts names. Occures in StepOne RDML files.
+              if (anyDuplicated(names(private$.react)) != FALSE) {
+                private$.react <- private$.react[unique(names(private$.react))]
+                warning("Duplicate reacts removed")
+              }
             }
           ))
 

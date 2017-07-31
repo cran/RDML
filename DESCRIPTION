@@ -2,9 +2,9 @@ Package: RDML
 Type: Package
 Title: Importing Real-Time Thermo Cycler (qPCR) Data from RDML Format
         Files
-Version: 0.9-6
+Version: 0.9-7
 LazyData: true
-Date: 2017-04-24
+Date: 2017-07-24
 Description: Imports real-time thermo cycler (qPCR) data from Real-time PCR
     Data Markup Language (RDML) and transforms to the appropriate formats of
     the 'qpcR' and 'chipPCR' packages. Contains a dendrogram visualization 
@@ -16,8 +16,10 @@ Authors@R: c(
     email = "stefan.roediger@b-tu.de",
     role = "aut"),
     person("Michal", "Burdukiewicz",
-    email = "michalburdukiewicz@gmail.com", role = "aut"))
-License: GPL (>= 2)
+    email = "michalburdukiewicz@gmail.com", role = "aut"),
+    person("Andrej-Nikolai", "Spiess",
+    email = "a.spiess@uke.de", role = "aut"))
+License: MIT + file LICENSE
 URL: https://github.com/kablag/RDML
 Depends: R (>= 3.2.0)
 Imports: checkmate (>= 1.6.2), data.table, pipeR, readxl, rlist (>=
@@ -31,10 +33,11 @@ Suggests: chipPCR, dplyr, ggplot2, knitr, kfigr, MBmca, shiny, shinyjs,
 VignetteBuilder: knitr
 RoxygenNote: 6.0.1
 NeedsCompilation: no
-Packaged: 2017-04-24 09:47:42 UTC; elf
+Packaged: 2017-07-31 09:40:58 UTC; elf
 Author: Konstantin A. Blagodatskikh [cre, aut],
   Stefan Roediger [aut],
-  Michal Burdukiewicz [aut]
+  Michal Burdukiewicz [aut],
+  Andrej-Nikolai Spiess [aut]
 Maintainer: Konstantin A. Blagodatskikh <k.blag@yandex.ru>
 Repository: CRAN
-Date/Publication: 2017-04-24 14:53:01 UTC
+Date/Publication: 2017-07-31 10:08:41 UTC

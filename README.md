@@ -3,7 +3,7 @@
 [![Travis-CI Build Status](https://travis-ci.org/kablag/RDML.svg?branch=master)](https://travis-ci.org/kablag/RDML)
 [![Rdoc](http://www.rdocumentation.org/badges/version/RDML)](http://www.rdocumentation.org/packages/RDML) 
 
-![RDML](https://github.com/kablag/RDML/blob/master/vignettes/RDML_logo.png)
+<img src="https://raw.githubusercontent.com/kablag/RDML/master/vignettes/RDML_logo.png" alt="RDML" width="100%">
 
 
 Imports qPCR data from RDML v1.1 format files ([Lefever et al. 2009](http://nar.oxfordjournals.org/content/32/5/1792.abstract?view=long&pmid=19223324)) and 
@@ -27,18 +27,22 @@ library(devtools)
 install_github("kablag/RDML")
 ```
 
+# Manual
+
+The manual is available [online](https://github.com/kablag/RDML).
+
 # Examples
 
 `RDML` imports various data formats (CSV, XMLX) besides the RDML format. Provided that the raw data 
 have a defined structure (as described in the vignette) the import should be 
 done by a few clicks. The example below shows the import of amplification curve
 data, which were stored in a CSV file. The function `rdmlEdit()` was used in the 
-[RKWard IDE/GUI](https://rkward.kde.org/) for further processing.
+[RKWard IDE/GUI](https://rkward.kde.org/) for further processing. rdmlEdit may be also accessed as a web server (http://shtest.evrogen.net/rdmlEdit/). 
 
-![Data Import](https://github.com/kablag/RDML/blob/master/vignettes/File_import.png)
+<img src="https://raw.githubusercontent.com/kablag/RDML/master/vignettes/File_import.png" alt="Data Import" width="100%">
 
-Once imported enables `rdmlEDIT()` and other functions from the `RDML` package complex 
+Once imported enables `rdmlEdit()` and other functions from the `RDML` package complex 
 data visualization and processing in the R statistical computing environment.
 
-![Data Import](https://github.com/kablag/RDML/blob/master/vignettes/data_view.png)
+<img src="https://raw.githubusercontent.com/kablag/RDML/master/vignettes/data_view.png" alt="Data View" width="100%">
 

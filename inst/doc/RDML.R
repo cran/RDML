@@ -42,21 +42,21 @@ cat(sprintf("Original object\t: %s ('id_1' bacame 'id_2')\nSimple copy\t\t: %s\n
             id1$id, id2$id, id3$id))
 
 ## ------------------------------------------------------------------------
-# Create 'real' copy of object
+## Create 'real' copy of object
 experiment <- lc96$experiment$`ca1eb225-ecea-4793-9804-87bfbb45f81d`$clone(deep = TRUE)
-# Try to set 'id' with wrong input type.
-# Correct type 'idType' can be seen at error message.
+## Try to set 'id' with wrong input type.
+## Correct type 'idType' can be seen at error message.
 tryCatch(experiment$id <- "exp1",
          error = function(e) print(e))
 
-# Set 'id' with correct input type - 'idType'
+## Set 'id' with correct input type - 'idType'
 experiment$id <- idType$new("exp1")
 
-# Similar operations for 'run'
+## Similar operations for 'run'
 run <- experiment$run$`65aeb1ec-b377-4ef6-b03f-92898d47488b`$clone(deep = TRUE)
 run$id <- idType$new("run1")
 
-# Replace original elements with modified
+## Replace original elements with modified
 experiment$run <- list(run)
 lc96$experiment <- list(experiment)
 
@@ -80,7 +80,7 @@ tab <- lc96$AsTable(
     else value
   }
 )
-# Remove row names for compact printing
+## Remove row names for compact printing
 rownames(tab) <- NULL
 head(tab)
 
@@ -88,7 +88,7 @@ head(tab)
 library(dplyr)
 library(ggplot2)
 
-# Prepare request to get only 'std' type samples
+## Prepare request to get only 'std' type samples
 filtered.tab <- filter(tab,
                        sample.type == "std")
 
@@ -110,7 +110,7 @@ tab <- lc96$AsTable(
              data$tar$id,
              run$id$id, # run id added to names
              sep = "~"))
-# Get all fluorescence data
+## Get all fluorescence data
 fdata <- as.data.frame(lc96$GetFData(tab,
                                      # We don't need long table format for CPP()
                                      long.table = FALSE))
@@ -122,11 +122,11 @@ fdata.cpp <- cbind(cyc = fdata[, 1],
 
 ## ---- fig.width = 6, fig.height = 4--------------------------------------
 tab$run.id <- "run.cpp"
-# Set fluorescence data from previous section
+## Set fluorescence data from previous section
 lc96$SetFData(fdata.cpp,
               tab)
 
-# View setted data
+## View setted data
 fdata <- lc96$GetFData(tab,
                        long.table = TRUE)
 ggplot(fdata, aes(cyc, fluor)) +
@@ -134,12 +134,12 @@ ggplot(fdata, aes(cyc, fluor)) +
                   color = target))
 
 ## ---- results = "hide", fig.width = 7, fig.height = 6--------------------
-# Load another built in RDML file
+## Load another built in RDML file
 stepone <- RDML$new(paste0(path.package("RDML"),
                            "/extdata/", "stepone_std.rdml"))
-# Merge it with our 'lc96' object
+## Merge it with our 'lc96' object
 merged <- MergeRDMLs(list(lc96, stepone))
-# View structure of new object
+## View structure of new object
 merged$AsDendrogram()
 
 ## ---- results = "hide"---------------------------------------------------
@@ -168,7 +168,7 @@ RDML$set("public", "CalcCq",
          }
 )
 
-# Create new object with our advanced class
+## Create new object with our advanced class
 stepone <- RDML$new(paste0(path.package("RDML"),
                            "/extdata/", "stepone_std.rdml"))
 
@@ -176,19 +176,19 @@ stepone <- RDML$new(paste0(path.package("RDML"),
 stepone$CalcCq()
 
 ## ---- fig.width = 6, fig.height = 3, results = "hide"--------------------
-### Create simulated data with AmpSim() from chipPCR package
-# Cq for data to be generated
+#### Create simulated data with AmpSim() from chipPCR package
+## Cq for data to be generated
 Cqs <- c(15, 17, 19, 21)
-# PCR si,ulation will be 35 cycles
+## PCR si,ulation will be 35 cycles
 fdata <- data.frame(cyc = 1:35)
 for(Cq in Cqs) {
   fdata <- cbind(fdata,
                  AmpSim(cyc = 1:35, Cq = Cq)[, 2])
 }
-# Set names for fluorescence curves
+## Set names for fluorescence curves
 colnames(fdata)[2:5] <- c("c1", "c2", "c3", "c4")
 
-# Create minimal description
+## Create minimal description
 descr <- data.frame(
   fdata.name = c("c1", "c2", "c3", "c4"),
   exp.id = c("exp1", "exp1", "exp1", "exp1"),
@@ -201,12 +201,12 @@ descr <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Create empty RDML object
+## Create empty RDML object
 sim <- RDML$new()
-# Add fluorescence data
+## Add fluorescence data
 sim$SetFData(fdata, descr)
 
-# Observe object
+## Observe object
 sim$AsDendrogram()
 fdata <- sim$GetFData(sim$AsTable(),
                       long.table = TRUE)

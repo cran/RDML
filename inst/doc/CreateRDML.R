@@ -208,8 +208,8 @@ video.scan$experiment$exp1$run$run3$thermalCyclingConditions <- idReferencesType
 # Process VideoScan data
 video.scan$ProcessVideoScan(last.cycle = c(35, 45, 55),
                             bg.range = list(c(1,8),
-                                           NULL,
-                                           NULL))
+                                            NULL,
+                                            NULL))
 
 ## ---- results = "hide", fig.width = 6, fig.height = 4--------------------
 # Visualize RDML object
@@ -218,13 +218,14 @@ video.scan$AsDendrogram()
 ## ---- results = "hide", fig.width = 6, fig.height = 4--------------------
 ## Visualise preprocessed data with Cq values as vertical dashed lines
 # Add custom column that contains the calculated Cq
-tab <- video.scan$AsTable(cq = {
-                 cq <- data$cq
-                 if (is.null(cq) || is.na(cq))
-                   NULL
-                 else
-                   cq
-               })
+tab <- video.scan$AsTable(
+  cq = {
+    cq <- data$cq
+    if (is.null(cq) || is.na(cq))
+      NULL
+    else
+      cq
+  })
 # Get preprocessed data in 'long.table' format
 dat <- video.scan$GetFData(tab[grepl("_CPP", tab[["run.id"]]), ],
                            long.table = TRUE)

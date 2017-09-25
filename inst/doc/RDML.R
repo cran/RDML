@@ -35,15 +35,15 @@ sample$quantity$value
 ## ------------------------------------------------------------------------
 id1 <- idType$new("id_1")
 id2 <- id1
-id3 <- id1$clone(deep = TRUE)
+id3 <- id1$copy()
 id2$id <- "id_2"
 id3$id <- "id_3"
-cat(sprintf("Original object\t: %s ('id_1' bacame 'id_2')\nSimple copy\t\t: %s\nClone\t\t\t: %s\n",
+cat(sprintf("Original object\t\t: %s ('id_1' became 'id_2')\nSimple copy\t\t\t: %s\n'Real' copy (clone)\t: %s\n",
             id1$id, id2$id, id3$id))
 
 ## ------------------------------------------------------------------------
 ## Create 'real' copy of object
-experiment <- lc96$experiment$`ca1eb225-ecea-4793-9804-87bfbb45f81d`$clone(deep = TRUE)
+experiment <- lc96$experiment$`ca1eb225-ecea-4793-9804-87bfbb45f81d`$copy()
 ## Try to set 'id' with wrong input type.
 ## Correct type 'idType' can be seen at error message.
 tryCatch(experiment$id <- "exp1",
@@ -53,7 +53,7 @@ tryCatch(experiment$id <- "exp1",
 experiment$id <- idType$new("exp1")
 
 ## Similar operations for 'run'
-run <- experiment$run$`65aeb1ec-b377-4ef6-b03f-92898d47488b`$clone(deep = TRUE)
+run <- experiment$run$`65aeb1ec-b377-4ef6-b03f-92898d47488b`$copy()
 run$id <- idType$new("run1")
 
 ## Replace original elements with modified
@@ -440,8 +440,8 @@ video.scan$experiment$exp1$run$run3$thermalCyclingConditions <- idReferencesType
 # Process VideoScan data
 video.scan$ProcessVideoScan(last.cycle = c(35, 45, 55),
                             bg.range = list(c(1,8),
-                                           NULL,
-                                           NULL))
+                                            NULL,
+                                            NULL))
 
 ## ---- results = "hide", fig.width = 6, fig.height = 4--------------------
 # Visualize RDML object
@@ -450,13 +450,14 @@ video.scan$AsDendrogram()
 ## ---- results = "hide", fig.width = 6, fig.height = 4--------------------
 ## Visualise preprocessed data with Cq values as vertical dashed lines
 # Add custom column that contains the calculated Cq
-tab <- video.scan$AsTable(cq = {
-                 cq <- data$cq
-                 if (is.null(cq) || is.na(cq))
-                   NULL
-                 else
-                   cq
-               })
+tab <- video.scan$AsTable(
+  cq = {
+    cq <- data$cq
+    if (is.null(cq) || is.na(cq))
+      NULL
+    else
+      cq
+  })
 # Get preprocessed data in 'long.table' format
 dat <- video.scan$GetFData(tab[grepl("_CPP", tab[["run.id"]]), ],
                            long.table = TRUE)

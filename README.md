@@ -31,7 +31,7 @@ install_github("kablag/RDML")
 
 # Manual
 
-The manual is available [online](https://github.com/kablag/RDML).
+The manual is available [online](https://kablag.github.io/RDML/).
 
 # Examples
 

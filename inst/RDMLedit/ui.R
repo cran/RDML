@@ -4,6 +4,7 @@ library(shinyjs)
 library(dplyr)
 library(ggvis)
 library(plotly)
+library(shinyMolBio)
 
 shinyUI(
   tags$html(
@@ -25,10 +26,10 @@ shinyUI(
       {
         #Not WinXp
         extendShinyjs(script = "www/js/my_shinyjs_scripts.js")
-      },
-      includeScript("www/js/single_double_click.js"),
-      includeScript("www/js/scripts.js"),
-      includeCSS("www/css/styles.css")
+      }#,
+      # includeScript("www/js/single_double_click.js"),
+      # includeScript("www/js/scripts.js"),
+      # includeCSS("www/css/styles.css")
     ),
     tags$div(
       navbarPage(
@@ -569,22 +570,40 @@ shinyUI(
                                         "Quantile normalization" = "luqn",
                                         "z-score" = "zscore")))),
                  fluidRow(
-                   column(4,
-                          selectInput("cqMethod",
-                                      "Cq method",
-                                      c("None" = "none",
-                                        "Threshold" = "th",
-                                        "SDM" = "sdm"))),
-                   conditionalPanel(
-                     condition = "input.cqMethod == 'th'",
-                     column(4,
-                            checkboxInput("autoThLevel",
-                                          "Auto Threshold",
-                                          TRUE)),
-                     conditionalPanel(
-                       condition = "input.autoThLevel == false",
-                       column(4,
-                              uiOutput("thLevelsUI"))))
+                   column(6,
+                          wellPanel(
+                            fluidRow(
+                              column(4,
+                                     selectInput("cqMethod",
+                                                 "Cq Method",
+                                                 c("None" = "none",
+                                                   "Threshold" = "th",
+                                                   "SDM" = "sdm"))),
+                              conditionalPanel(
+                                condition = "input.cqMethod == 'th'",
+                                column(4,
+                                       checkboxInput("autoThLevel",
+                                                     "Auto Threshold",
+                                                     TRUE)),
+                                conditionalPanel(
+                                  condition = "input.autoThLevel == false",
+                                  column(4,
+                                         uiOutput("thLevelsUI")))
+                              )
+                            )
+                          )),
+                   column(6,
+                          wellPanel(
+                            fluidRow(
+                              column(4,
+                                     selectInput("hookMethod",
+                                                 "Hook Detection Method",
+                                                 c("None" = "none",
+                                                   "hookreg" = "hookreg",
+                                                   "hookregNL" = "hookregNL",
+                                                   "both" = "Both")))
+                            )
+                          ))
                    # column(2,
                    #        actionButton("recalculateCq",
                    #                     "Recalculate Cq"))
@@ -601,7 +620,8 @@ shinyUI(
                                           "Dye" = "target.dyeId",
                                           "Sample" = "sample",
                                           "Sample Type" = "sample.type",
-                                          "Position" = "position"))),
+                                          "Position" = "position",
+                                          "Hook" = "hook"))),
                      column(2,
                             selectInput("shapeqPCRby",
                                         "Line Type by",
@@ -612,7 +632,8 @@ shinyUI(
                                           "Dye" = "target.dyeId",
                                           "Sample" = "sample",
                                           "Sample Type" = "sample.type",
-                                          "Position" = "position"))),
+                                          "Position" = "position",
+                                          "Hook" = "hook"))),
                      column(2,
                             selectInput("showTargetsadp",
                                         "Show Targets",
@@ -628,43 +649,43 @@ shinyUI(
                             checkboxInput("logScale",
                                           "Log Scale"))),
                    fluidRow(
-                     column(6, plotlyOutput("qPCRPlot")),
+                     # column(6, plotlyOutput("qPCRPlot")),
+                     column(6, uiOutput("qPCRPlotUI")),
                      column(6, wellPanel(
-                            fluidRow(column(4, selectInput("showqPCRExperiment",
-                                                        "Experiment", c())),
-                                     column(4, selectInput("showqPCRRun",
-                                                        "Run", c()))),
-                            htmlOutput("plateTbl"))))),
+                       fluidRow(column(4, selectInput("showqPCRExperiment",
+                                                      "Experiment", c())),
+                                column(4, selectInput("showqPCRRun",
+                                                      "Run", c()))),
+                       htmlOutput("plateTbl"))))),
                  dataTableOutput("qPCRDt"),
                  value = "adp"),
         tabPanel("Melting Curves",
-                 
-                   fluidRow(
+                 fluidRow(
+                   column(2,
+                          checkboxInput("preprocessMelting",
+                                        "Preprocess")),
+                   conditionalPanel(
+                     condition = "input.preprocessMelting == true",
                      column(2,
-                            checkboxInput("preprocessMelting",
-                                          "Preprocess")),
+                            checkboxInput("bgAdjMelting",
+                                          "Adjust the Background Signal",
+                                          FALSE)),
                      conditionalPanel(
-                       condition = "input.preprocessMelting == true",
+                       condition = "input.bgAdjMelting == true",
                        column(2,
-                              checkboxInput("bgAdjMelting",
-                                            "Adjust the Background Signal",
-                                            FALSE)),
-                       conditionalPanel(
-                         condition = "input.bgAdjMelting == true",
-                         column(2,
-                                sliderInput("bgRangeMelting", 
-                                            label = "Temperature Background Range (°C)", min = 0, 
-                                            max = 100, value = c(50, 55), step = 1))),
-                       column(2,
-                              checkboxInput("minMaxMelting",
-                                            "Min-Max Normalization",
-                                            FALSE)),
-                       column(2,
-                              sliderInput("dfFactMelting", 
-                                          label = "Factor to Smooth the Curve", min = 0.6, 
-                                          max = 1.1, value = 0.95, step = 0.05))
-                     )
-                   ),
+                              sliderInput("bgRangeMelting", 
+                                          label = "Temperature Background Range (°C)", min = 0, 
+                                          max = 100, value = c(50, 55), step = 1))),
+                     column(2,
+                            checkboxInput("minMaxMelting",
+                                          "Min-Max Normalization",
+                                          FALSE)),
+                     column(2,
+                            sliderInput("dfFactMelting", 
+                                        label = "Factor to Smooth the Curve", min = 0.6, 
+                                        max = 1.1, value = 0.95, step = 0.05))
+                   )
+                 ),
                  wellPanel(
                    fluidRow(
                      column(2,
@@ -694,22 +715,23 @@ shinyUI(
                                         "Show Targets",
                                         multiple = TRUE,
                                         choices = ""))
-                     ),
+                   ),
                    fluidRow(
                      column(6,
-                     wellPanel(
-                       fluidRow(column(4, selectInput("showMeltingExperiment",
-                                                      "Experiment", c())),
-                                column(4, selectInput("showMeltingRun",
-                                                      "Run", c()))),
-                       htmlOutput("plateTblMelting")))),
+                            wellPanel(
+                              fluidRow(column(4, selectInput("showMeltingExperiment",
+                                                             "Experiment", c())),
+                                       column(4, selectInput("showMeltingRun",
+                                                             "Run", c()))),
+                              htmlOutput("plateTblMelting")))),
                    plotlyOutput("meltingPlot")),
                  dataTableOutput("meltingDt"),
                  value = "mdp"),
         tabPanel("Store",
-                 wellPanel(downloadButton("downloadRDML",
-                                          "Store RDML"),
-                           tags$p("Note that if you made any preprocession all fluorescence points will be overwritten with the new calculated values!!!"))),
+                 wellPanel(
+                   downloadButton("downloadRDML",
+                                  "Store RDML"),
+                   tags$p("Note that if you made any preprocession all fluorescence points will be overwritten with the new calculated values!!!"))),
         tabPanel("Help",
                  includeMarkdown("md/help.md")),
         id = "mainNavbar"

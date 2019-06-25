@@ -9,21 +9,21 @@ dataType$set("public", "rawAdp",
 dataType$set("public", "PreprocessAdp",
              function(smooth, smooth.method, normqPCR.method) {
                if (!is.environment(self$rawAdp)) {
-                 self$rawAdp <- private$.adp$clone(deep = TRUE)
+                 self$rawAdp <- private$.adp$copy()
                }
                private$.adp$fpoints$fluor <- 
-                   CPP(self$rawAdp$fpoints$cyc,
-                       self$rawAdp$fpoints$fluor,
-                       smoother = smooth,
-                       method = smooth.method,
-                       method.norm = normqPCR.method)[[1]]
+                 CPP(self$rawAdp$fpoints$cyc,
+                     self$rawAdp$fpoints$fluor,
+                     smoother = smooth,
+                     method = smooth.method,
+                     method.norm = normqPCR.method)[[1]]
              },
              overwrite = TRUE)
 
 dataType$set("public", "UndoPreprocessAdp",
              function() {
                if (!is.environment(self$rawAdp)) {
-                 self$rawAdp <- private$.adp$clone(deep = TRUE)
+                 self$rawAdp <- private$.adp$copy()
                } else {
                  private$.adp$fpoints$fluor <- 
                    self$rawAdp$fpoints$fluor
@@ -69,6 +69,64 @@ dataType$set("public", "CalcCq",
              },
              overwrite = TRUE)
 
+dataType$set("public",
+             "DetectHook",
+             function(hookDetectionMethod, sample, position) {
+               
+               hookRes <- 
+                 if (hookDetectionMethod == "hookreg" || hookDetectionMethod == "both") {
+                   as.logical(hookreg(x = self$adp$fpoints[["cyc"]],
+                                      y = self$adp$fpoints[["fluor"]])[["hook"]])
+                 } else {
+                   FALSE
+                 }
+               hookNLRes <- 
+                 if (hookDetectionMethod == "hookregNL" || hookDetectionMethod == "both") {
+                   as.logical(hookregNL(x = self$adp$fpoints[["cyc"]],
+                                      y = self$adp$fpoints[["fluor"]])[["hook"]])
+                 } else {
+                   FALSE
+                 }
+               
+               if (hookRes && hookNLRes) {
+                 sample$annotation <- 
+                   c(sample$annotation, 
+                     annotationType$new(sprintf("%s_hookDetectionMethod",position),
+                                        "both"))
+               } else {
+                 if (hookRes) {
+                   sample$annotation <- 
+                     c(sample$annotation, 
+                       annotationType$new(sprintf("%s_hookDetectionMethod",position),
+                                          "hookreg"))
+                 }
+                 if (hookNLRes) {
+                   sample$annotation <- 
+                     c(sample$annotation, 
+                       annotationType$new(sprintf("%s_hookDetectionMethod",position),
+                                          "hookregNL"))
+                 }
+               }
+               
+               if (hookRes || hookNLRes) {
+                 sample$annotation <- 
+                   c(sample$annotation, 
+                     annotationType$new(sprintf("%s_hook", position),
+                                        "TRUE"))
+               } else {
+                 sample$annotation <- 
+                   c(sample$annotation, 
+                     annotationType$new(sprintf("%s_hookDetectionMethod",position),
+                                        "hookDetectionMethod"))
+                 sample$annotation <- 
+                   c(sample$annotation, 
+                     annotationType$new(sprintf("%s_hook", position),
+                                        "FALSE"))
+               }
+               ""
+             },
+             overwrite = TRUE)
+
 dataType$set("public", "rawMdp",
              NA,
              overwrite = TRUE)
@@ -76,7 +134,7 @@ dataType$set("public", "rawMdp",
 dataType$set("public", "PreprocessMdp",
              function(bgadj, bg, minmax, df.fact) {
                if (!is.environment(self$rawMdp)) {
-                 self$rawMdp <- private$.mdp$clone(deep = TRUE)
+                 self$rawMdp <- private$.mdp$copy()
                } 
                private$.mdp$fpoints$fluor <- 
                  mcaSmoother(self$rawMdp$fpoints$tmp,
@@ -91,7 +149,7 @@ dataType$set("public", "PreprocessMdp",
 dataType$set("public", "UndoPreprocessMdp",
              function() {
                if (!is.environment(self$rawMdp)) {
-                 self$rawMdp <- private$.mdp$clone(deep = TRUE)
+                 self$rawMdp <- private$.mdp$copy()
                } else {
                  private$.mdp$fpoints$fluor <- 
                    self$rawMdp$fpoints$fluor

@@ -37,9 +37,11 @@
 #' }
 RDML$set("public", "GetFData",
          function(request,
-                  limits = NULL,
                   dp.type = "adp",
                   long.table = FALSE) {
+           checkChoice(dp.type, c("adp", "mdp"))
+           checkFlag(long.table)
+           
            if (missing(request))
              request <- self$AsTable()
            else

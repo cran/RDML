@@ -83,12 +83,15 @@ as.integer <- function(val) {
 # Misc functions -------------------------------------------------
 ns <- NULL
 
-FromPositionToId <- function(react.id) {
+FromPositionToId <- function(react.id, 
+                             pcrFormat = pcrFormatType$new(8, 12, 
+                                                           labelFormatType$new("ABC"), 
+                                                           labelFormatType$new("123"))) {
   row <- which(LETTERS ==
                  gsub("([A-Z])[0-9]+", "\\1", react.id))
   col <- as.integer(gsub("[A-Z]([0-9]+)", "\\1", react.id))
   # as.character((row - 1) * 12 + col)
-  (row - 1) * 12 + col
+  (row - 1) * pcrFormat$columns + col
 }
 
 GetIds <- function(l) {
@@ -105,7 +108,7 @@ GetDilutionsRoche <- function(uniq.folder)
     return(NA)
   }
   rdml.doc <- read_xml(paste0(uniq.folder,"/calculated_data.xml"))
-  if (length(xml_ns(rdml.doc) != 3)) {
+  if (length(xml_ns(rdml.doc)) != 9) {
     return(NULL)
   }
   rdml.env$ns <- xml_ns_rename(xml_ns(rdml.doc), d1 = "calc", d2 = "analys", d3 = "quant")
@@ -254,109 +257,99 @@ GetRefGenesRoche <- function(uniq.folder)
 RDML$set("public", "initialize", function(filename,
                                           show.progress = TRUE,
                                           conditions.sep = NULL,
-                                          format = "auto" #,
-                                          # dateMade = NULL,
-                                          # dateUpdated = NULL,
-                                          # id = NULL,
-                                          # experimenter = NULL,
-                                          # documentation = NULL,
-                                          # dye = NULL,
-                                          # sample = NULL,
-                                          # target = NULL,
-                                          # thermalCyclingConditions = NULL,
-                                          # experiment = NULL
-) {
+                                          format = "auto") {
   if(missing(filename)) {
     return()
   }
   assertString(filename)
-
+  
   # ABI7500 -----------------------------------------------------------------
   fromABI <- function() {
-    tryCatch({
-      uniq.folder <- tempfile()
-      unzipped <- unzip(filename, exdir = uniq.folder)
-      # multicomponent.data <- paste0(uniq.folder, "\\apldbio\\sds\\multicomponent_data.txt") %>>%
-      #   read.delim(skip = 2, stringsAsFactors = FALSE) %>>%
-      #   filter(!is.na(WELL))
-      data.file <- paste0(uniq.folder, "/apldbio/sds/multicomponent_data.txt")
-      multicomponent.data <- readChar(data.file, file.info(data.file)$size) %>>%
-        str_match_all("([0-9]+)\\t([0-9]+)\\t([A-Z]+)\\t[0-9E\\-]+\\.?[0-9E\\-]*\\t([0-9E\\-]+\\.?[0-9E\\-]*)")
-      multicomponent.data <- as.data.frame(multicomponent.data[[1]], stringsAsFactors = FALSE)
-      names(multicomponent.data) <- c("_", "well", "cyc", "dye", "fluor")
-      multicomponent.data <- multicomponent.data %>>%
-        data.table()
-      multicomponent.data[, c("well", "cyc", "fluor") := list(as.numeric(well),
-                                                              as.numeric(cyc),
-                                                              as.numeric(fluor))]
-      ncycles <- multicomponent.data$cyc %>>% max + 1
-
-      plate.setup <- paste0(uniq.folder, "/apldbio/sds/plate_setup.xml") %>>%
-        read_xml()
-
-      rdml.env$ns <- xml_ns(plate.setup)
-      snames <- getTextVector(plate.setup,
-                              "/Plate/FeatureMap/Feature[Id='sample']/../FeatureValue/FeatureItem/Sample/Name")
-      names(snames) <-
-        getIntegerVector(plate.setup,
-                         "/Plate/FeatureMap/Feature[Id='sample']/../FeatureValue/Index") + 1
-
-      description <- data.frame()
-      list.iter(xml_find_all(plate.setup,
-                             "/Plate/FeatureMap/Feature[Id='detector-task']/../FeatureValue"),
-                el ~ {
-                  index <- getIntegerValue(el, "./Index") + 1
-
-                  #only one task allowed!
-                  task <- getTextValue(el, "./FeatureItem/DetectorTaskList/*[1]/Task") %>>%
-                    switch (
-                      UNKNOWN = "unkn",
-                      NTC = "ntc",
-                      STANDARD = "std"
-                    )
-                  # size <- .[["FeatureItem"]][["DetectorTaskList"]] %>>% xmlSize
-                  list.iter(xml_find_all(el, "./FeatureItem/DetectorTaskList"),
-                            sub.el ~ {
-                              description <<-
-                                rbind(description,
-                                      data.frame(fdata.name =
-                                                   paste(index,
-                                                         getTextVector(sub.el,
-                                                                      "./DetectorTask/Detector/Reporter")),
-                                                 exp.id = "exp1",
-                                                 run.id = "run1",
-                                                 react.id = index,
-                                                 sample = ifelse(is.na(snames[as.character(index)]),
-                                                                 "unnamed",
-                                                                 snames[as.character(index)]) %>>% unname(),
-                                                 sample.type = task,
-                                                 target = getTextVector(sub.el, "./DetectorTask/Detector/Name"),
-                                                 target.dyeId = getTextVector(sub.el, "./DetectorTask/Detector/Reporter"),
-                                                 quantity = getNumericVector(sub.el, "./DetectorTask/Concentration"),
-                                                 IsOmit = FALSE,
-                                                 stringsAsFactors = FALSE))
-                            })})
-
-      description <- data.table(description)
-      omitted.i <- getIntegerVector(plate.setup,
-                                    "/Plate/Wells/Well[IsOmit='true']/Index") + 1
-      description[react.id == omitted.i, IsOmit := TRUE]
-      description <- description[IsOmit == FALSE]
-      fdata <- cbind(data.frame(multicomponent.data$cyc %>>% unique() + 1),
-                     apply(description, 1,
-                           function(r) {
-                             multicomponent.data[well == as.integer(r["react.id"]) - 1 &
-                                                   dye == r["target.dyeId"],
-                                                 fluor]
-                           }))
-      names(fdata) <- c("cyc", description$fdata.name)
-      self$SetFData(fdata, description)
-      self$id <- list(rdmlIdType$new("ABI" , "1"))
-    },
-    error = function(e) { stop(e) },
-    finally = unlink(uniq.folder, recursive = TRUE))
+    # tryCatch({
+    uniq.folder <- tempfile()
+    unzipped <- unzip(filename, exdir = uniq.folder)
+    # multicomponent.data <- paste0(uniq.folder, "\\apldbio\\sds\\multicomponent_data.txt") %>>%
+    #   read.delim(skip = 2, stringsAsFactors = FALSE) %>>%
+    #   filter(!is.na(WELL))
+    data.file <- paste0(uniq.folder, "/apldbio/sds/multicomponent_data.txt")
+    multicomponent.data <- readChar(data.file, file.info(data.file)$size) %>>%
+      str_match_all("([0-9]+)\\t([0-9]+)\\t([A-Z]+)\\t[0-9E\\-]+\\.?[0-9E\\-]*\\t([0-9E\\-]+\\.?[0-9E\\-]*)")
+    multicomponent.data <- as.data.frame(multicomponent.data[[1]], stringsAsFactors = FALSE)
+    names(multicomponent.data) <- c("_", "well", "cyc", "dye", "fluor")
+    multicomponent.data <- multicomponent.data %>>%
+      data.table()
+    multicomponent.data[, c("well", "cyc", "fluor") := list(as.numeric(well),
+                                                            as.numeric(cyc),
+                                                            as.numeric(fluor))]
+    ncycles <- multicomponent.data$cyc %>>% max + 1
+    
+    plate.setup <- paste0(uniq.folder, "/apldbio/sds/plate_setup.xml") %>>%
+      read_xml()
+    
+    rdml.env$ns <- xml_ns(plate.setup)
+    snames <- getTextVector(plate.setup,
+                            "/Plate/FeatureMap/Feature[Id='sample']/../FeatureValue/FeatureItem/Sample/Name")
+    names(snames) <-
+      getIntegerVector(plate.setup,
+                       "/Plate/FeatureMap/Feature[Id='sample']/../FeatureValue/Index") + 1
+    
+    description <- data.frame()
+    list.iter(xml_find_all(plate.setup,
+                           "/Plate/FeatureMap/Feature[Id='detector-task']/../FeatureValue"),
+              el ~ {
+                index <- getIntegerValue(el, "./Index") + 1
+                
+                #only one task allowed!
+                task <- getTextValue(el, "./FeatureItem/DetectorTaskList/*[1]/Task") %>>%
+                  switch (
+                    UNKNOWN = "unkn",
+                    NTC = "ntc",
+                    STANDARD = "std"
+                  )
+                # size <- .[["FeatureItem"]][["DetectorTaskList"]] %>>% xmlSize
+                list.iter(xml_find_all(el, "./FeatureItem/DetectorTaskList"),
+                          sub.el ~ {
+                            description <<-
+                              rbind(description,
+                                    data.frame(fdata.name =
+                                                 paste(index,
+                                                       getTextVector(sub.el,
+                                                                     "./DetectorTask/Detector/Reporter")),
+                                               exp.id = "exp1",
+                                               run.id = "run1",
+                                               react.id = index,
+                                               sample = ifelse(is.na(snames[as.character(index)]),
+                                                               "unnamed",
+                                                               snames[as.character(index)]) %>>% unname(),
+                                               sample.type = task,
+                                               target = getTextVector(sub.el, "./DetectorTask/Detector/Name"),
+                                               target.dyeId = getTextVector(sub.el, "./DetectorTask/Detector/Reporter"),
+                                               quantity = getNumericVector(sub.el, "./DetectorTask/Concentration"),
+                                               IsOmit = FALSE,
+                                               stringsAsFactors = FALSE))
+                          })})
+    
+    description <- data.table(description)
+    omitted.i <- getIntegerVector(plate.setup,
+                                  "/Plate/Wells/Well[IsOmit='true']/Index") + 1
+    description[react.id == omitted.i, IsOmit := TRUE]
+    description <- description[IsOmit == FALSE]
+    fdata <- cbind(data.frame(multicomponent.data$cyc %>>% unique() + 1),
+                   apply(description, 1,
+                         function(r) {
+                           multicomponent.data[well == as.integer(r["react.id"]) - 1 &
+                                                 dye == r["target.dyeId"],
+                                               fluor]
+                         }))
+    names(fdata) <- c("cyc", description$fdata.name)
+    self$SetFData(fdata, description)
+    self$id <- list(rdmlIdType$new("ABI" , "1"))
+    # },
+    # error = function(e) { stop(e) },
+    # finally = 
+    unlink(uniq.folder, recursive = TRUE)
   }
-
+  
   # RotorGene -----------------------------------------------------------------
   fromRotorGene <- function() {
     dat <- filename %>>%
@@ -392,9 +385,9 @@ RDML$set("public", "initialize", function(filename,
         description[description$fdata.name %in% ids, "target"] <<- group$Name
       })
     rdml.env$ns <- xml_ns(dat)
-
+    
     original.targets <- description$target
-
+    
     dat %>>%
       xml_find_all("/Experiment/RawChannels/RawChannel") %>>%
       list.iter(rawChannel ~ {
@@ -419,7 +412,7 @@ RDML$set("public", "initialize", function(filename,
       })
     self$id <- list(rdmlIdType$new("RotorGene" , "1"))
   }
-
+  
   # From Excel -----------------------------------------------------------------
   fromExcel <- function() {
     descr <- read_excel(filename,
@@ -431,7 +424,7 @@ RDML$set("public", "initialize", function(filename,
         as.data.frame
     },
     error = function(e) NULL)
-
+    
     mdp_data <- tryCatch({
       read_excel(filename,
                  sheet = "mdp") %>>%
@@ -439,13 +432,13 @@ RDML$set("public", "initialize", function(filename,
         as.data.frame
     },
     error = function(e) NULL)
-
+    
     if (!is.null(adp_data))
       self$SetFData(adp_data, descr)
     if (!is.null(mdp_data))
       self$SetFData(mdp_data, descr, fdata.type = "mdp")
   }
-
+  
   # From DTprime dna-technology ------------------------------------------------------
   fromDTprime <- function() {
     DT96_OVERLOAD_SIGNAL <- 15000 # ??
@@ -462,7 +455,7 @@ RDML$set("public", "initialize", function(filename,
     kits <- lns[(which(lns == "$Information about TESTs:$ ") + 1):
                   (which(lns == "$Parameters MutationMC:$ ") - 1)] %>>%
       str_split(" ")
-
+    
     fdata.raw <- lns[(which(lns == "$Results of optical measurements:$ ") + 1):
                        length(lns)] %>>%
       str_split("\\s+") %>>%
@@ -471,7 +464,7 @@ RDML$set("public", "initialize", function(filename,
       setnames(c("dye", "x1", "x2", "x3", "cycle", "exposition", "background",
                  paste("tube", 0:95, sep = "_"),
                  "?"))
-
+    
     fdata.raw.nrow <- nrow(fdata.raw)
     expositions <- c(fdata.raw[1, exposition],
                      fdata.raw[2, exposition])
@@ -507,7 +500,7 @@ RDML$set("public", "initialize", function(filename,
                                     fdata.dye.400 * 5
                                   }
                                 }
-
+                                
                                 set(fdata, ,
                                     sprintf("%s_%s_%s", tube.name, dye,
                                             "2000"),
@@ -542,7 +535,7 @@ RDML$set("public", "initialize", function(filename,
                                 descr.400 <- descr.2000 %>>%
                                   (dt ~ {
                                     dt$fdata.name <- sprintf("%s_%s_%s", tube.name, dye,
-                                                              "400")
+                                                             "400")
                                     dt$exp.id <- ".400"
                                     dt
                                   })
@@ -570,7 +563,7 @@ RDML$set("public", "initialize", function(filename,
     self$SetFData(fdata, description)
     self$id <- list(rdmlIdType$new("DTprime" , "1"))
   }
-
+  
   # From CSV -----------------------------------------------------------------
   fromCSV <- function() {
     pcrdata <- read.csv(filename)
@@ -647,7 +640,7 @@ RDML$set("public", "initialize", function(filename,
   #   self$id <- list(rdmlIdType$new("Roche Diagnostics" , "1"))
   #   #print (self)
   # }#fromCobas
-
+  
   # From RDML, lc96 -----------------------------------------------------------------
   fromRDML <- function() {
     rdml.env$ns <- NULL
@@ -659,39 +652,39 @@ RDML$set("public", "initialize", function(filename,
     unzipped.rdml <- unzip(filename, exdir = uniq.folder)
     dilutions.r <- NULL
     ref.genes.r <- NULL
-
+    
     # tryCatch({
-      # Roche use more than one file at RDML zip.
-      # One of the files store dilutions information.
-      if (length(unzipped.rdml) > 1) {
-        # cat("\nParsing Roche(?) data...")
-        rdml.doc <- read_xml(paste0(uniq.folder,"/rdml_data.xml"))
-        dilutions.r <- GetDilutionsRoche(uniq.folder)
-        conditions.r <- GetConditionsRoche(uniq.folder)
-        ref.genes.r <- GetRefGenesRoche(uniq.folder)
-        rdml.env$ns <- xml_ns_rename(xml_ns(rdml.doc), "d1" = "rdml")
-      } else {
-        # cat("\nParsing data...")
-        rdml.doc <- read_xml(unzipped.rdml)
-        rdml.env$ns <- xml_ns(rdml.doc)
-        if (!("rdml" %in% names(rdml.env$ns))) {
-          rdml.env$ns <- xml_ns_rename(xml_ns(rdml.doc), d1 = "rdml")
-        }
+    # Roche use more than one file at RDML zip.
+    # One of the files store dilutions information.
+    if (length(unzipped.rdml) > 1) {
+      # cat("\nParsing Roche(?) data...")
+      rdml.doc <- read_xml(paste0(uniq.folder,"/rdml_data.xml"))
+      dilutions.r <- GetDilutionsRoche(uniq.folder)
+      conditions.r <- GetConditionsRoche(uniq.folder)
+      ref.genes.r <- GetRefGenesRoche(uniq.folder)
+      rdml.env$ns <- xml_ns_rename(xml_ns(rdml.doc), "d1" = "rdml")
+    } else {
+      # cat("\nParsing data...")
+      rdml.doc <- read_xml(unzipped.rdml)
+      rdml.env$ns <- xml_ns(rdml.doc)
+      if (!("rdml" %in% names(rdml.env$ns))) {
+        rdml.env$ns <- xml_ns_rename(xml_ns(rdml.doc), d1 = "rdml")
       }
+    }
     # },
     # error = function(e) { stop(e) },
     # finally = unlink(uniq.folder, recursive = TRUE)
     # )
     unlink(uniq.folder, recursive = TRUE)
-
+    
     # dateMade -----------------------------------------------------------------
     # cat("\nGetting dateMade")
     private$.dateMade <- getTextValue(rdml.doc, "/rdml:rdml/rdml:dateMade")
-
+    
     # dateUpdated -----------------------------------------------------------------
     # cat("\nGetting dateUpdated")
     private$.dateUpdated <- getTextValue(rdml.doc, "/rdml:rdml/rdml:dateUpdated")
-
+    
     # id -----------------------------------------------------------------
     # cat("\nGetting id")
     private$.id <-
@@ -720,7 +713,7 @@ RDML$set("public", "initialize", function(filename,
                  )) %>>%
         list.names(.$id$id)
     }
-
+    
     # documentation -----------------------------------------------------------------
     # cat("\nGetting documentation")
     private$.documentation <- {
@@ -734,7 +727,7 @@ RDML$set("public", "initialize", function(filename,
                  )) %>>%
         list.names(.$id$id)
     }
-
+    
     # dye -----------------------------------------------------------------
     # cat("\nGetting dye")
     private$.dye <- {
@@ -746,7 +739,7 @@ RDML$set("public", "initialize", function(filename,
                )) %>>%
         list.names(.$id$id)
     }
-
+    
     # sample -----------------------------------------------------------------
     # cat("\nGetting sample")
     private$.sample <-
@@ -755,7 +748,7 @@ RDML$set("public", "initialize", function(filename,
                sample ~
                {
                  type <- getTextValue(sample, "./rdml:type")
-
+                 
                  # remove Roche omitted ('ntp') samples
                  if(type == "ntp")
                    return(NULL)
@@ -765,7 +758,7 @@ RDML$set("public", "initialize", function(filename,
                    description = getTextValue(sample, "./rdml:description"),
                    documentation =
                      lapply(sample %>>%
-                                xml_find_all("./rdml:documentation", rdml.env$ns),
+                              xml_find_all("./rdml:documentation", rdml.env$ns),
                             function(doc) genIdRef(doc)),
                    xRef =
                      list.map(sample %>>%
@@ -805,18 +798,18 @@ RDML$set("public", "initialize", function(filename,
                    calibratorSample =
                      getLogicalValue(sample, "./rdml:calibaratorSample"),
                    cdnaSynthesisMethod = cdnaSynthesisMethodType$new(
-                       enzyme = getTextValue(sample, "./rdml:cdnaSynthesisMethod/rdml:enzyme"),
-                       primingMethod =
-                         primingMethodType$new(getTextValue(sample,
-                                                            "./rdml:cdnaSynthesisMethod/rdml:primingMethod")),
-                       dnaseTreatment = getLogicalValue(sample, "./rdml:cdnaSynthesisMethod/rdml:dnaseTreatment"),
-                       thermalCyclingConditions =
-                         tryCatch(
-                           genIdRef(xml_find_first(sample,
-                                                   "./rdml:cdnaSynthesisMethod/rdml:thermalCyclingConditions",
-                                                   ns = rdml.env$ns)),
-                           error = function(e) NULL)
-                     ),
+                     enzyme = getTextValue(sample, "./rdml:cdnaSynthesisMethod/rdml:enzyme"),
+                     primingMethod =
+                       primingMethodType$new(getTextValue(sample,
+                                                          "./rdml:cdnaSynthesisMethod/rdml:primingMethod")),
+                     dnaseTreatment = getLogicalValue(sample, "./rdml:cdnaSynthesisMethod/rdml:dnaseTreatment"),
+                     thermalCyclingConditions =
+                       tryCatch(
+                         genIdRef(xml_find_first(sample,
+                                                 "./rdml:cdnaSynthesisMethod/rdml:thermalCyclingConditions",
+                                                 ns = rdml.env$ns)),
+                         error = function(e) NULL)
+                   ),
                    templateQuantity =
                      tryCatch(
                        templateQuantityType$new(
@@ -830,7 +823,7 @@ RDML$set("public", "initialize", function(filename,
                }) %>>%
       list.filter(!is.null(.)) %>>%
       list.names(.$id$id)
-
+    
     # target -----------------------------------------------------------------
     # cat("\nGetting target")
     private$.target <-
@@ -880,7 +873,7 @@ RDML$set("public", "initialize", function(filename,
                          idReferencesType$new(getTextValue(target, "./rdml:dyeId"))
                      ),
                    # dyeId = NA,
-
+                   
                    sequences = sequencesType$new(
                      forwardPrimer =
                        tryCatch(
@@ -951,7 +944,7 @@ RDML$set("public", "initialize", function(filename,
                }
       ) %>>%
       list.names(.$id$id)
-
+    
     # thermalCyclingConditions -------------------------------------------------
     # cat("\nGetting thermalCyclingConditions")
     private$.thermalCyclingConditions <-
@@ -967,13 +960,13 @@ RDML$set("public", "initialize", function(filename,
                             function(doc) genIdRef(doc)),
                    lidTemperature =
                      getNumericValue(tcc, "./rdml:lidTemperature"),
-
+                   
                    experimenter =
                      list.map(tcc %>>%
                                 xml_find_all("./rdml:experimenter", rdml.env$ns),
                               experimenter ~ genIdRef(experimenter)
                      ),
-
+                   
                    step = list.map(tcc %>>%
                                      xml_find_all("./rdml:step", rdml.env$ns),
                                    step ~ {
@@ -1054,7 +1047,7 @@ RDML$set("public", "initialize", function(filename,
                          "']/rdml:run[@id='",
                          run.id,
                          "']/rdml:react[@id='",
-                         #                                                                          react.id[length(react.id)],
+                         # react.id[length(react.id)],
                          react.id,
                          "']/rdml:data/rdml:tar[@id='",
                          tar.id,
@@ -1085,20 +1078,11 @@ RDML$set("public", "initialize", function(filename,
               # tryCatch(
               adpsType$new(
                 data.table(cyc = cyc, tmp = tmp, fluor = fluor))
-              # ,
-              #   warning = function(w) {
-              #     dat <<- list(cyc, tmp, fluor)
-              #     stop("warn")
-              #   }
-              # )
             } else {
               adpsType$new(
                 data.table(cyc = cyc, fluor = fluor))
             }
           } else {
-            #           matrix(ncol = 2,
-            #                  dimnames = list(NULL,
-            #                                  c("cyc", "tmp", "fluor")))
             NULL
           }
         },
@@ -1106,18 +1090,8 @@ RDML$set("public", "initialize", function(filename,
           tmp <- getNumericVector(rdml.doc,paste0(data.req, "/rdml:mdp/rdml:tmp"))
           fluor <- getNumericVector(rdml.doc,paste0(data.req, "/rdml:mdp/rdml:fluor"))
           if (length(fluor) != 0 && !is.null(fluor)) {
-            #           matrix(c(tmp, fluor),
-            #                                                byrow = FALSE,
-            #                                                ncol = 2,
-            #                                                dimnames = list(NULL,
-            #                                                                c("tmp", "fluor"))) %>>%
-            #             typeof %>>% print
-            #           NULL
             mdpsType$new(data.table(tmp = tmp, fluor = fluor))
           } else {
-            #           matrix(ncol = 2,
-            #                  dimnames = list(NULL,
-            #                                  c("tmp", "fluor")))
             NULL
           }
         },
@@ -1127,16 +1101,20 @@ RDML$set("public", "initialize", function(filename,
         quantFluor = getNumericValue(data, "./rdml:quantFluor")
       )
     }
-
+    
     # react -------------------------------------------------
-    GetReact <- function(react, experiment.id, run.id) {
+    GetReact <- function(react, experiment.id, run.id, 
+                         pcrFormat = pcrFormatType$new(
+                           8, 12, 
+                           labelFormatType$new("ABC"), 
+                           labelFormatType$new("123"))) {
       react.id <- xml_attr(react, "id")
       react.id.corrected <- tryCatch(
         as.integer(react.id),
         warning = function(w) {
           # if react.id is 'B1' not '13'
           # like in StepOne
-          FromPositionToId(react.id)
+          FromPositionToId(react.id, pcrFormat)
         }
       )
       #     cat(sprintf("\nreact: %i", react.id))
@@ -1144,7 +1122,7 @@ RDML$set("public", "initialize", function(filename,
         react %>>%
         xml_find_first("./rdml:sample", rdml.env$ns) %>>%
         xml_attr("id")
-
+      
       if(length(unzipped.rdml) > 1 &&
          length(private$.id) != 0 &&
          private$.id[[1]]$publisher == "Roche Diagnostics") {
@@ -1154,7 +1132,7 @@ RDML$set("public", "initialize", function(filename,
         # Better names for Roche
         sample <- private$.sample[[sample]]$description
       }
-
+      
       reactType$new(
         id = reactIdType$new(react.id.corrected), #sample.id
         #       # will be calculated at the end of init
@@ -1171,30 +1149,49 @@ RDML$set("public", "initialize", function(filename,
         }
       )
     }
-
+    
     # run -------------------------------------------------
     GetRun <- function(run, experiment.id) {
       run.id <- xml_attr(run, "id")
       pcrFormat <- {
-        rows <- getIntegerValue(run, "./rdml:pcrFormat/rdml:rows")
-        # check for absent of pcrFormat
-        # like in StepOne
-        if (!is.null(rows) && !is.na(rows)) {
-          pcrFormatType$new(
-            rows = rows,
-            columns = getIntegerValue(run, "./rdml:pcrFormat/rdml:columns"),
-            rowLabel = labelFormatType$new(
-              getTextValue(run, "./rdml:pcrFormat/rdml:rowLabel")),
-            columnLabel = labelFormatType$new(
-              getTextValue(run, "./rdml:pcrFormat/rdml:columnLabel"))
-          )
-        } else {
-          pcrFormatType$new(
-            rows = 8,
-            columns = 12,
-            rowLabel = labelFormatType$new("ABC"),
-            columnLabel = labelFormatType$new("123")
-          )
+        pcrFormatStr <- getTextValue(run, "./rdml:pcrFormat")
+        # Quantstudio pcrFormat
+        if (!is.null(pcrFormatStr) && grepl("well", pcrFormatStr)) {
+          if (grepl("96-well", pcrFormatStr)) {
+            pcrFormatType$new(
+              rows = 8,
+              columns = 12,
+              rowLabel = labelFormatType$new("ABC"),
+              columnLabel = labelFormatType$new("123")
+            )
+          } else {
+            pcrFormatType$new(
+              rows = 16,
+              columns = 24,
+              rowLabel = labelFormatType$new("ABC"),
+              columnLabel = labelFormatType$new("123")
+            )
+          }
+        } else { # correct RDML pcrFormat
+          rows <- getIntegerValue(run, "./rdml:pcrFormat/rdml:rows")
+          # check for absent of 'pcrFormat' like in StepOne
+          if (!is.null(rows) && !is.na(rows)) {
+            pcrFormatType$new(
+              rows = rows,
+              columns = getIntegerValue(run, "./rdml:pcrFormat/rdml:columns"),
+              rowLabel = labelFormatType$new(
+                getTextValue(run, "./rdml:pcrFormat/rdml:rowLabel")),
+              columnLabel = labelFormatType$new(
+                getTextValue(run, "./rdml:pcrFormat/rdml:columnLabel"))
+            )
+          } else {
+            pcrFormatType$new(
+              rows = 8,
+              columns = 12,
+              rowLabel = labelFormatType$new("ABC"),
+              columnLabel = labelFormatType$new("123")
+            )
+          }
         }
       }
       if (show.progress)
@@ -1236,12 +1233,12 @@ RDML$set("public", "initialize", function(filename,
                      xml_find_all("./rdml:react", rdml.env$ns),
                    react ~ GetReact(react,
                                     experiment.id,
-                                    run.id)) %>>%
+                                    run.id,
+                                    pcrFormat)) %>>%
           list.filter(!is.null(.))
       )
-
     }
-
+    
     # experiment -------------------------------------------------
     GetExperiment <- function(experiment) {
       experiment.id <- xml_attr(experiment, "id")
@@ -1261,8 +1258,8 @@ RDML$set("public", "initialize", function(filename,
           )
       )
     }
-
-
+    
+    
     private$.experiment <-
       list.map(rdml.doc %>>%
                  xml_find_all("./rdml:experiment", rdml.env$ns),
@@ -1292,11 +1289,14 @@ RDML$set("public", "initialize", function(filename,
             )
           }
         }
+      }
+      # delete copied runs
+      for (run.i in length(private$.experiment[[1]]$run):2){
         private$.experiment[[1]]$run[[run.i]] <- NULL
       }
       private$.experiment[[1]]$run[[1]]$id <- idType$new("Combined Run")
     }
-
+    
     # Roche LC96 extra parsing -------------------------------------------------
     # parse original!!! Roche files
     if (length(unzipped.rdml) > 1 &&
@@ -1307,7 +1307,7 @@ RDML$set("public", "initialize", function(filename,
       }
       private$.sample <- list.names(private$.sample,
                                     .$id$id)
-
+      
       # cat("Adding Roche ref genes\n")
       if (!is.null(ref.genes.r) &&
           !is.na(ref.genes.r) &&
@@ -1334,7 +1334,7 @@ RDML$set("public", "initialize", function(filename,
       # cat("Adding Roche quantities\n")
       for (target in dilutions.r %>>% names()) {
         for (r.id in dilutions.r[[target]] %>>% names()) {
-          sample.name <- tbl[as.integer(r.id), sample, mult = "first"]
+          sample.name <- tbl[react.id == as.integer(r.id), sample][1]
           private$.sample[[sample.name]]$quantity <-
             quantityType$new(
               value = unname(dilutions.r[[1]][r.id]),
@@ -1349,7 +1349,7 @@ RDML$set("public", "initialize", function(filename,
                 value = as.character(dilutions.r[[target]][r.id])))
         }
       }
-
+      
       # cat("Adding Roche conditions\n")
       for (r.id in conditions.r %>>% names()) {
         sample.name <- tbl[as.integer(r.id), sample,
@@ -1361,9 +1361,9 @@ RDML$set("public", "initialize", function(filename,
               value = conditions.r[r.id]))
       }
     }
-
+    
   }
-
+  
   # file format select -------------------------------------------------
   if (format == "auto")
     format <- file_ext(filename)

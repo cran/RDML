@@ -5,13 +5,16 @@ library(tools)
 library(pipeR)
 library(chipPCR)
 library(MBmca)
-library(dpcR)
+library(PCRedux)
+#library(dpcR)
 library(data.table)
 library(ggplot2)
 library(plotly)
 library(rlist)
 library(whisker)
 library(stringr)
+library(shinyMolBio)
+library(tidyverse)
 
 source("rdml.extensions.R")
 
@@ -29,9 +32,9 @@ testNull <- function(val) {
 
 
 shinyServer(function(input, output, session) {
-  session$onSessionEnded(function() {
-    stopApp()
-  })
+  # session$onSessionEnded(function() {
+  #   stopApp()
+  # })
   
   values <- reactiveValues(RDMLs = list(),
                            log = NULL)
@@ -103,7 +106,7 @@ shinyServer(function(input, output, session) {
                         choices = names(values$RDMLs)[names(values$RDMLs) != input$rdmlFileSlct],
                         selected = NULL)
       # clone selected to temp RDML 
-      values$rdml <- values$RDMLs[[input$rdmlFileSlct]]$clone(deep = TRUE)
+      values$rdml <- values$RDMLs[[input$rdmlFileSlct]]$copy()
       # update fields
       updateTextInput(session,
                       "dateMadeText",
@@ -176,7 +179,7 @@ shinyServer(function(input, output, session) {
       new.name <- str_replace(input$rdmlFileSlct,
                               "@.*$",
                               format(Sys.time(), "@%H%M%S"))
-      values$RDMLs[[new.name]] <- values$rdml$clone(deep = TRUE)
+      values$RDMLs[[new.name]] <- values$rdml$copy()
     })
   })
   
@@ -2153,6 +2156,23 @@ shinyServer(function(input, output, session) {
         }, by = fdata.name]
   })
   
+  hookCalcsDone <- reactive({
+    req(preprocessAdpDone())
+    tbl <- values$rdml$AsTable()[adp == TRUE]
+    if (nrow(tbl) == 0 || input$hookMethod == "none"){
+      return(runif(1))
+    }
+    tbl[adp == TRUE,
+        {
+          values$rdml$experiment[[exp.id]]$
+            run[[run.id]]$
+            react[[as.character(react.id)]]$
+            data[[target]]$DetectHook(input$hookMethod,
+                                      values$rdml$sample[[sample]],
+                                      react.id)
+        }, by = fdata.name]
+  })
+  
   preprocessMdpDone <- reactive({
     if (is.null(values$rdml))
       return(NULL)
@@ -2201,7 +2221,8 @@ shinyServer(function(input, output, session) {
   
   rdmlTable <- reactive({
     # if (is.null(values$rdml) || !(input$mainNavbar %in% c("adp","mdp")))
-    if (is.null(cqCalcsDone()) || 
+    if (is.null(cqCalcsDone()) ||
+        is.null(hookCalcsDone()) || 
         is.null(preprocessMdpDone()) ||
         !(input$mainNavbar %in% c("adp","mdp")))
       return(NULL)
@@ -2232,6 +2253,16 @@ shinyServer(function(input, output, session) {
             } else {
               quantFluor
             }
+          },
+          hook = {
+            hook <- sample[[react$sample$id]][["annotation"]][[sprintf("%s_hook", react$id$id)]]
+            as.logical(
+              if (is.null(hook)) {
+                NA
+              } else {
+                hook$value
+              }
+            )
           })
       )[get(input$mainNavbar) == TRUE &
           exp.id == input$showqPCRExperiment &
@@ -2245,14 +2276,15 @@ shinyServer(function(input, output, session) {
       if (nrow(tbl) == 0) {
         return(NULL)
       }
-      values$lockReplot <- 0
+      # values$lockReplot <- 0
       values$selectedTubes <-
         data.frame(position = tbl$position %>>% unique(),
                    selected = FALSE,
                    stringsAsFactors = FALSE) %>>%
         mutate(row = str_extract(position, "[A-Z]") %>>% factor(levels = rev(LETTERS[1:values$rdml$experiment[[input$showqPCRExperiment]]$
                                                                                        run[[input$showqPCRRun]]$pcrFormat$rows])),
-               column = str_extract(position, "[0-9]+") %>>% as.numeric() %>>% as.character())
+               column = str_extract(position, "[0-9]+") %>>% as.numeric() %>>% as.character()) %>% 
+        group_by(position)
       rownames(values$selectedTubes) <- values$selectedTubes$position
       targets <- unique(tbl$target)
       updateSelectInput(session,
@@ -2268,59 +2300,11 @@ shinyServer(function(input, output, session) {
     req(rdmlTable())
     # cat("Redraw plate\n")
     isolate({
-      tbl <- rdmlTable()
-      tbl[1, 1] <- tbl[1, 1]
-      cell.template <- paste0("<td id='tube_{{position}}'",
-                              "title='{{position}}\u000A{{sample}}' ",
-                              "class='{{class}}' ",
-                              "style='background-color:rgba({{bgcolor}}, 0.35)'>")#,
-      #"{{snamef}}</td>")
-      descr <- tbl %>>%
-        group_by(position) %>>%
-        summarise_each(funs(first)) %>>%
-        # left_join(calc.Cqs(c("tr"), values$preprocessed$tr %>>% names),
-        #           by = "position") %>>%
-        left_join(values$selectedTubes
-                  , by = "position") %>>%
-        group_by(fdata.name) %>>%
-        mutate(snamef = format.smpl.name(sample, 5),
-               class = paste(ifelse(selected,
-                                    "sel",
-                                    "")),
-               bgcolor = "red") %>>%
-        as.data.frame()
-      rownames(descr) <- descr$position
-      pcr.format <- values$rdml$experiment[[input$showqPCRExperiment]]$
-        run[[input$showqPCRRun]]$pcrFormat
-      sprintf(paste0('<table id="plateTable" class="plateTable"><thead>',
-                     '<tr><th id="toggleall" class="br-triangle"></th>%s</tr></thead>',
-                     '<tbody>%s</tbody></table>',
-                     '<script>addCellOnClick();</script>'),
-              list.map(1:pcr.format$columns, col ~ sprintf("<th id='col_%02i'>%s</th>", col, col)) %>>%
-                paste(collapse = ""),
-              list.map(LETTERS[1:pcr.format$rows],
-                       row ~ sprintf("<tr><th id='row_%s' class='%s'>%s</th>%s</tr>", row,
-                                     {
-                                       if (as.integer(charToRaw(row)) %% 2 == 0) "even-row"
-                                       else "odd-row"
-                                     },
-                                     row,
-                                     list.map(1:pcr.format$columns,
-                                              col ~ {
-                                                tube <- sprintf("%s%02i", row, col)
-                                                if (is.na(descr[tube, "fdata.name"]))
-                                                  return("<td></td>")
-                                                paste0(
-                                                  whisker.render(cell.template,
-                                                                 descr[tube, ]),
-                                                  descr[tube, "snamef"],
-                                                  "</td>"
-                                                )
-                                              }) %>>%
-                                       paste(collapse = ""))
-              ) %>>%
-                paste(collapse = "")) %>>%
-        HTML
+      pcrPlateInput("mainPcrPlate", "",
+                              rdmlTable(),
+                              values$rdml$experiment[[input$showqPCRExperiment]]$
+                                run[[input$showqPCRRun]]$pcrFormat,
+                    interactive = TRUE)
     })
   })
   
@@ -2336,77 +2320,11 @@ shinyServer(function(input, output, session) {
   
   # plate click
   observe({
-    req(input$cellClick)
-    isolate({
-      values$lockReplot <- values$lockReplot + 1
-      # row <- input$cellClick[2]
-      # col <- input$cellClick[3]
-      id <- str_split(input$cellClick[2], "_")[[1]]
-      dblclick <- ifelse(input$cellClick[3] == "dblclick",
-                         TRUE, FALSE)
-      ctrl <- ifelse(input$cellClick[4] == "ctrl",
-                     TRUE, FALSE)
-      toggle <- function(action, positions) {
-        for (position in positions) {
-          action(paste("tube", position, sep = "_"), "sel", NULL)
-        }
-      }
-      selectPositions <- function(positions) {
-        if (length(positions) == 0)
-          return(NULL)
-        selected <- values$selectedTubes
-        if (dblclick) {
-          selected$selected <- FALSE
-          toggle(removeClass, values$selectedTubes$position)
-        }
-        if (all(values$selectedTubes[positions, "selected"] == TRUE)) {
-          selected[positions, "selected"] <- FALSE
-          toggle(removeClass, positions)
-        } else {
-          selected[positions, "selected"] <- TRUE
-          toggle(addClass, positions)
-        }
-        values$selectedTubes <- selected
-      }
-      switch(id[1],
-             "tube" = {
-               positions <- {
-                 if (ctrl) {
-                   descr <- rdmlTable()
-                   smpl <- descr[descr$position == id[2], sample]
-                   target <- descr[descr$position == id[2], target]
-                   descr[descr$sample == smpl & descr$target == target, position]
-                 } else {
-                   id[2]
-                 }}
-               selectPositions(positions)
-             },
-             "toggleall" = {
-               if (all(values$selectedTubes$selected == TRUE) || dblclick) {
-                 values$selectedTubes$selected <- FALSE
-                 toggle(removeClass, values$selectedTubes$position)
-               } else {
-                 values$selectedTubes$selected <- TRUE
-                 toggle(addClass, values$selectedTubes$position)
-               }
-             },
-             "col" = {
-               positions <- str_extract(values$selectedTubes$position,
-                                        paste0("[A-Z]",
-                                               id[2])) %>>%
-                 na.omit
-               selectPositions(positions)
-             },
-             "row" = {
-               positions <- str_extract(values$selectedTubes$position,
-                                        paste0(id[2],
-                                               "[0-9]+")) %>>%
-                 na.omit()
-               selectPositions(positions)
-             },
-             {})
-      values$lockReplot <- values$lockReplot - 1
-    })
+    req(input$mainPcrPlate)
+    values$selectedTubes <- 
+      values$selectedTubes %>% 
+      mutate(selected = if (position %in% input$mainPcrPlate) TRUE
+             else FALSE)
   })
   
   # filter qPCRDt
@@ -2438,25 +2356,36 @@ shinyServer(function(input, output, session) {
     fdata
   })
   
-  fdata.filtered <- reactive({
-    req(fdata())
-    if (values$lockReplot != 0)
-      return(NULL)
-    fd <- fdata()[target %in% input[[paste0("showTargets", input$mainNavbar)]]]
-    if (!all(values$selectedTubes$selected == FALSE)) {
-      fd <- fd[
-        position %in% values$selectedTubes$position[values$selectedTubes$selected == TRUE]]
-    }
-    if (nrow(fd) == 0)
-      return(NULL)
-    fd
+  # fdata.filtered <- reactive({
+  #   req(fdata())
+  #   # if (values$lockReplot != 0)
+  #     # return(NULL)
+  #   
+  #   fd <- fdata()[target %in% input[[paste0("showTargets", input$mainNavbar)]]]
+  #   fd <- fd[position %in% values$selectedTubes$position[values$selectedTubes$selected == TRUE]]
+  #   if (nrow(fd) == 0)
+  #     return(NULL)
+  #   fd
+  # })
+  
+  observeEvent(
+    c(input$mainPcrPlate, input[[paste0("showTargets", input$mainNavbar)]]),
+    {
+    
+    fd <- fdata() %>% 
+      filter(!(target %in% input[[paste0("showTargets", input$mainNavbar)]]) | 
+               !(position %in% input$mainPcrPlate))
+    # fdd <<- fd
+    updateCurves(session, "qPCRPlot", 
+                 hideCurves = unique(fd$fdata.name))
   })
   
-  output$qPCRPlot <- renderPlotly({
-    if (is.null(fdata.filtered()) || input$mainNavbar == "mdp")
+  # output$qPCRPlot <- renderPlotly({
+  output$qPCRPlotUI <- renderUI({
+    if (is.null(fdata()) || input$mainNavbar == "mdp")
       return(NULL)
     
-    fpoints <- fdata.filtered()
+    fpoints <- fdata()
     # just to copy in memory to new table
     fpoints[1, 1] <- fpoints[1, 1]
     # plot ticks setup
@@ -2472,120 +2401,128 @@ shinyServer(function(input, output, session) {
                        # )
               , by = target]
     }
-    if (input$logScale) {
-      fpoints[, c("fluor", "quantFluor", "quantFluor.mean") := 
-                list(
-                  {
-                    new.fluor <- log10(fluor)
-                    ifelse(is.nan(new.fluor) | new.fluor == -Inf,
-                           NA,
-                           new.fluor)},
-                  {
-                    new.fluor <- log10(quantFluor)
-                    ifelse(is.nan(new.fluor) | new.fluor == -Inf,
-                           0,
-                           new.fluor)},
-                  {
-                    new.fluor <- log10(quantFluor.mean)
-                    ifelse(is.nan(new.fluor) | new.fluor == -Inf,
-                           0,
-                           new.fluor)}
-                )]
-    }
-    
-    
-    p <- 
-      ggplot(fpoints) +
-      geom_line(aes_string(x = "cyc", y = "fluor",
-                           group = "fdata.name",
-                           color = {
-                             if (input$colorqPCRby == "none")
-                               NULL
-                             else
-                               input$colorqPCRby
-                           },
-                           linetype = {
-                             if (input$shapeqPCRby == "none")
-                               NULL
-                             else
-                               input$shapeqPCRby
-                           }),
-                size = 0.5) +
-      switch(input$showCq,
-             none = NULL,
-             yes = geom_point(aes_string(x = "cq", y = "quantFluor",
-                                         group = "fdata.name",
-                                         color = {
-                                           if (input$colorqPCRby == "none")
-                                             NULL
-                                           else
-                                             input$colorqPCRby
-                                         },
-                                         shape = {
-                                           if (input$shapeqPCRby == "none")
-                                             NULL
-                                           else
-                                             input$shapeqPCRby
-                                         }),
-                              size = 2),
-             mean = geom_point(aes_string(x = "cq.mean", y = "quantFluor.mean",
-                                          group = "fdata.name",
-                                          color = {
-                                            if (input$colorqPCRby == "none")
-                                              NULL
-                                            else
-                                              input$colorqPCRby
-                                          },
-                                          shape = {
-                                            if (input$shapeqPCRby == "none")
-                                              NULL
-                                            else
-                                              input$shapeqPCRby
-                                          }
-             ),
-             size = 2)) +
-             {
-               if (input$cqMethod == "th" && !input$autoThLevel) {
-                 geom_hline(aes_string(
-                   yintercept = "th",
-                   group = "target",
-                   color = {
-                     if (input$colorqPCRby == "none")
-                       NULL
-                     else
-                       input$colorqPCRby
-                   },
-                   linetype = {
-                     if (input$shapeqPCRby == "none")
-                       NULL
-                     else
-                       input$shapeqPCRby
-                   }))
-               } else {
-                 NULL
-               }
-             } +
-      labs(x = "Cycles", y = "RFU",
-           color = NULL, linetype = NULL, fill = NULL) +
-      theme_bw() +
-      # scale_x_continuous(minor_breaks = seq(1, max.cyc, 1),
-      #                    limits = c(1, max.cyc)) +
-      # scale_y_continuous(breaks = ticks,
-      #                    minor_breaks = minor.ticks) +
-      theme(legend.position = "right",
-            legend.box = "horizontal",
-            panel.grid.minor = element_line(size = 1)) 
-    # Not available with plotly
-    # + 
-    # {
-    #   if (input$logScale) {
-    #     annotation_logticks()
-    #   } else {
-    #     NULL
-    #   }
+    # if (input$logScale) {
+    #   fpoints[, c("fluor", "quantFluor", "quantFluor.mean") := 
+    #             list(
+    #               {
+    #                 new.fluor <- log10(fluor)
+    #                 ifelse(is.nan(new.fluor) | new.fluor == -Inf,
+    #                        NA,
+    #                        new.fluor)},
+    #               {
+    #                 new.fluor <- log10(quantFluor)
+    #                 ifelse(is.nan(new.fluor) | new.fluor == -Inf,
+    #                        0,
+    #                        new.fluor)},
+    #               {
+    #                 new.fluor <- log10(quantFluor.mean)
+    #                 ifelse(is.nan(new.fluor) | new.fluor == -Inf,
+    #                        0,
+    #                        new.fluor)}
+    #             )]
     # }
     
-    p
+    # 
+    # p <- 
+    #   ggplot(fpoints) +
+    #   geom_line(aes_string(x = "cyc", y = "fluor",
+    #                        group = "fdata.name",
+    #                        color = {
+    #                          if (input$colorqPCRby == "none")
+    #                            NULL
+    #                          else
+    #                            input$colorqPCRby
+    #                        },
+    #                        linetype = {
+    #                          if (input$shapeqPCRby == "none")
+    #                            NULL
+    #                          else
+    #                            input$shapeqPCRby
+    #                        }),
+    #             size = 0.5) +
+    #   switch(input$showCq,
+    #          none = NULL,
+    #          yes = geom_point(aes_string(x = "cq", y = "quantFluor",
+    #                                      group = "fdata.name",
+    #                                      color = {
+    #                                        if (input$colorqPCRby == "none")
+    #                                          NULL
+    #                                        else
+    #                                          input$colorqPCRby
+    #                                      },
+    #                                      shape = {
+    #                                        if (input$shapeqPCRby == "none")
+    #                                          NULL
+    #                                        else
+    #                                          input$shapeqPCRby
+    #                                      }),
+    #                           size = 2),
+    #          mean = geom_point(aes_string(x = "cq.mean", y = "quantFluor.mean",
+    #                                       group = "fdata.name",
+    #                                       color = {
+    #                                         if (input$colorqPCRby == "none")
+    #                                           NULL
+    #                                         else
+    #                                           input$colorqPCRby
+    #                                       },
+    #                                       shape = {
+    #                                         if (input$shapeqPCRby == "none")
+    #                                           NULL
+    #                                         else
+    #                                           input$shapeqPCRby
+    #                                       }
+    #          ),
+    #          size = 2)) +
+    #          {
+    #            if (input$cqMethod == "th" && !input$autoThLevel) {
+    #              geom_hline(aes_string(
+    #                yintercept = "th",
+    #                group = "target",
+    #                color = {
+    #                  if (input$colorqPCRby == "none")
+    #                    NULL
+    #                  else
+    #                    input$colorqPCRby
+    #                },
+    #                linetype = {
+    #                  if (input$shapeqPCRby == "none")
+    #                    NULL
+    #                  else
+    #                    input$shapeqPCRby
+    #                }))
+    #            } else {
+    #              NULL
+    #            }
+    #          } +
+    #   labs(x = "Cycles", y = "RFU",
+    #        color = NULL, linetype = NULL, fill = NULL) +
+    #   theme_bw() +
+    #   # scale_x_continuous(minor_breaks = seq(1, max.cyc, 1),
+    #   #                    limits = c(1, max.cyc)) +
+    #   # scale_y_continuous(breaks = ticks,
+    #   #                    minor_breaks = minor.ticks) +
+    #   theme(legend.position = "right",
+    #         legend.box = "horizontal",
+    #         panel.grid.minor = element_line(size = 1)) 
+    # # Not available with plotly
+    # # + 
+    # # {
+    # #   if (input$logScale) {
+    # #     annotation_logticks()
+    # #   } else {
+    # #     NULL
+    # #   }
+    # # }
+    # 
+    # p
+    renderAmpCurves("qPCRPlot", "AmpCurves",
+                    ampCurves = fpoints,
+                    colorBy = if (input$colorqPCRby == "none")
+                      NULL else input$colorqPCRby,
+                    linetypeBy = if (input$shapeqPCRby == "none")
+                      NULL else input$shapeqPCRby,
+                    logScale = input$logScale,
+                    showLegend = TRUE)
   })
   
   output$qPCRDt <- renderDataTable({
@@ -2652,12 +2589,14 @@ shinyServer(function(input, output, session) {
   
   # Download ----------------------------------------------------------------
   
+  
   output$downloadRDML <- downloadHandler(
     filename = function() {
+      # updLog(input$rdmlFileSlct)
       paste0(input$rdmlFileSlct, ".rdml")
     },
     content = function(file) {
-      output <- values$rdml$AsXML(file)
+      values$rdml$AsXML(file)
     }
   )
   

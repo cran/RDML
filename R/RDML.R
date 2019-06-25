@@ -130,6 +130,7 @@
 #' 
 #' ## Use plotCurves function from the chipPCR package to 
 #' ## get an overview of the amplification curves
+#' tmp <- as.data.frame(tmp)
 #' plotCurves(tmp[,1], tmp[,-1])
 #' par(mfrow = c(1,1))
 #' ## Use inder function from the chipPCR package to 
@@ -156,7 +157,7 @@
 #' library(chipPCR)
 #' ## Extract all qPCR data 
 #' tab <- cfx96$AsTable()
-#' cfx96.qPCR <- cfx96$GetFData(tab)
+#' cfx96.qPCR <- as.data.frame(cfx96$GetFData(tab))
 #' plotCurves(cfx96.qPCR[,1], cfx96.qPCR[,-1], type = "l")
 #' 
 #' ## Extract all melting data 
@@ -191,7 +192,8 @@ RDML <- R6Class("RDML",
                     if (missing(file.name))
                       return(tree)
                     
-                    con <- file("rdml_data.xml", "w")
+                    xmlFile <- paste0(tempdir(), "/rdml_data.xml")
+                    con <- file(xmlFile, "w")
                     tryCatch({
                       cat(iconv(tree,
                                 to = "UTF-8"),
@@ -201,9 +203,8 @@ RDML <- R6Class("RDML",
                       close(con)
                     })
                     
-                    zip(file.name,
-                        "rdml_data.xml")
-                    unlink("rdml_data.xml")
+                    zip(file.name, xmlFile)
+                    unlink(xmlFile)
                   }
                 ),
                 private = list(

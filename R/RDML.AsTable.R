@@ -51,10 +51,10 @@
 #' tab <- stepone$AsTable(
 #'          name.pattern = paste(react$sample$id, react$position),
 #'          add.columns = list(cq30 = if(data$cq >= 30) ">=30" else "<30",
-#'          quantity = as.factor(sample[[react$sample$id]]$quantity$value))
+#'          quantity = sample[[react$sample$id]]$quantity$value)
 #'          )
 #' ## Show cq30 and quantities
-#' tab[c("cq30", "quantity")]
+#' tab[, c("cq30", "quantity")]
 #' ## Get fluorescence values for 'std' type samples
 #' ## in format ready for ggplot function
 #' library(dplyr)
@@ -66,7 +66,7 @@
 #' ggplot(fdata, aes(x = cyc, y = fluor,
 #'                   group = fdata.name,
 #'                   colour = cq30,
-#'                   shape = quantity)) +
+#'                   shape = as.factor(quantity))) +
 #'                   geom_line() + geom_point()
 #' }
 RDML$set("public", "AsTable",
@@ -156,7 +156,7 @@ RDML$set("public", "AsTable",
            }
            setkey(out, "fdata.name")
            if (length(unique(out$fdata.name)) != length(out$fdata.name)) {
-             warning("fdata.name column has duplicates! Try another name.pattern.")
+             warning("fdata.name column has duplicates! Try another 'name.pattern'.")
            }
            out
          },

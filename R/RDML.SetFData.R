@@ -22,7 +22,7 @@
 #' tab <- cfx96$AsTable()
 #' tab2 <- tab
 #' tab2$run.id <- "cpp"
-#' cfx96.qPCR <- cfx96$GetFData(tab)
+#' cfx96.qPCR <- as.data.frame(cfx96$GetFData(tab))
 #' cpp <- cbind(cyc = cfx96.qPCR[, 1],
 #'  apply(cfx96.qPCR[, -1], 2, 
 #'    function(y) CPP(x = cfx96.qPCR[, 1], y = y)$y.norm))
@@ -32,11 +32,11 @@
 #' cfx96.gg <- cfx96$GetFData(tab, long.table = TRUE)
 #' cpp.gg <- cfx96$GetFData(tab2,
 #'                          long.table = TRUE)
-#' plot1 <- ggplot(cfx96.gg, aes(x = cyc, y = fluo,
+#' plot1 <- ggplot(cfx96.gg, aes(x = cyc, y = fluor,
 #'                 group=fdata.name)) +
 #'                  geom_line() +
 #'                  ggtitle("Raw data")
-#' plot2 <- ggplot(cpp.gg, aes(x = cyc, y = fluo,
+#' plot2 <- ggplot(cpp.gg, aes(x = cyc, y = fluor,
 #'                 group=fdata.name)) +
 #'                  geom_line() +
 #'                  ggtitle("CPP processed data")
@@ -53,6 +53,8 @@ RDML$set("public", "SetFData",
            #            first.col.name <- ifelse(fdata.type == "adp",
            #                                     "cyc",
            #                                     "tmp")
+           checkChoice(fdata.type, c("adp", "mdp"))
+           
            fdata <- data.table(fdata)
            names(fdata)[1] <- "cyc"
            
@@ -173,9 +175,6 @@ RDML$set("public", "SetFData",
                  }
                }
            }
-           
-           
-           
            # add concentrations 
            if (!is.null(description$quantity)) {
              for (sample.name in description$sample %>>% unique()) {

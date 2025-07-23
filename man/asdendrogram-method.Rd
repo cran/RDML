@@ -15,7 +15,6 @@ Plots and/or returns the structure of \code{RDML} file as
 \code{\link[stats]{dendrogram}} (tree-like structure.)
 }
 \examples{
-\dontrun{
 PATH <- path.package("RDML")
 filename <- paste(PATH, "/extdata/", "BioRad_qPCR_melt.rdml", sep ="")
 cfx96 <- RDML$new(filename)
@@ -23,7 +22,6 @@ cfx96 <- RDML$new(filename)
 cfx96$AsDendrogram()
 #assign dendrogram to the object
 dendr <- cfx96$AsDendrogram(plot.dendrogram = FALSE)
-}
 }
 \author{
 Konstantin A. Blagodatskikh <k.blag@yandex.ru>, Stefan Roediger 

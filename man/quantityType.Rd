@@ -4,9 +4,8 @@
 \name{quantityType}
 \alias{quantityType}
 \title{quantityType R6 class.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-quantityType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 A quantity is always defined by its value and its unit. Inherits:
@@ -21,4 +20,49 @@ A quantity is always defined by its value and its unit. Inherits:
   }
 }
 
-\keyword{datasets}
+\section{Super class}{
+\code{\link[RDML:rdmlBaseType]{RDML::rdmlBaseType}} -> \code{quantityType}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-quantityType-new}{\code{quantityType$new()}}
+\item \href{#method-quantityType-clone}{\code{quantityType$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id=".asXMLnodes"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-.asXMLnodes'><code>RDML::rdmlBaseType$.asXMLnodes()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="copy"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-copy'><code>RDML::rdmlBaseType$copy()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="print"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-print'><code>RDML::rdmlBaseType$print()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-quantityType-new"></a>}}
+\if{latex}{\out{\hypertarget{method-quantityType-new}{}}}
+\subsection{Method \code{new()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{quantityType$new(value, unit)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-quantityType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-quantityType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{quantityType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}

@@ -4,9 +4,8 @@
 \name{documentationType}
 \alias{documentationType}
 \title{documentationType R6 class.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-documentationType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 These elements should be used if the same description applies to many
@@ -21,4 +20,49 @@ samples, targets or experiments. Inherits: \link{rdmlBaseType}.
   }
 }
 
-\keyword{datasets}
+\section{Super class}{
+\code{\link[RDML:rdmlBaseType]{RDML::rdmlBaseType}} -> \code{documentationType}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-documentationType-new}{\code{documentationType$new()}}
+\item \href{#method-documentationType-clone}{\code{documentationType$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id=".asXMLnodes"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-.asXMLnodes'><code>RDML::rdmlBaseType$.asXMLnodes()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="copy"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-copy'><code>RDML::rdmlBaseType$copy()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="print"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-print'><code>RDML::rdmlBaseType$print()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-documentationType-new"></a>}}
+\if{latex}{\out{\hypertarget{method-documentationType-new}{}}}
+\subsection{Method \code{new()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{documentationType$new(id, text = NULL)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-documentationType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-documentationType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{documentationType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}

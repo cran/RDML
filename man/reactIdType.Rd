@@ -4,9 +4,8 @@
 \name{reactIdType}
 \alias{reactIdType}
 \title{reactIdType R6 class.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-reactIdType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 Contains identificator for reactType. Inherits: \link{rdmlBaseType}.
@@ -19,4 +18,49 @@ Contains identificator for reactType. Inherits: \link{rdmlBaseType}.
 }
 }
 
-\keyword{datasets}
+\section{Super classes}{
+\code{\link[RDML:rdmlBaseType]{RDML::rdmlBaseType}} -> \code{\link[RDML:idType]{RDML::idType}} -> \code{reactIdType}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-reactIdType-new}{\code{reactIdType$new()}}
+\item \href{#method-reactIdType-clone}{\code{reactIdType$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="copy"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-copy'><code>RDML::rdmlBaseType$copy()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="print"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-print'><code>RDML::rdmlBaseType$print()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="idType" data-id=".asXMLnodes"><a href='../../RDML/html/idType.html#method-idType-.asXMLnodes'><code>RDML::idType$.asXMLnodes()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-reactIdType-new"></a>}}
+\if{latex}{\out{\hypertarget{method-reactIdType-new}{}}}
+\subsection{Method \code{new()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{reactIdType$new(id)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-reactIdType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-reactIdType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{reactIdType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}

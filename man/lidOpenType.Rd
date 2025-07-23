@@ -4,9 +4,8 @@
 \name{lidOpenType}
 \alias{lidOpenType}
 \title{lidOpenType R6 class.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-lidOpenType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 This step waits for the user to open the lid and continues afterwards. It
@@ -18,4 +17,49 @@ step is maintained. Inherits: \link{rdmlBaseType}.
  \preformatted{lidOpenType$new()}
 }
 
-\keyword{datasets}
+\section{Super class}{
+\code{\link[RDML:rdmlBaseType]{RDML::rdmlBaseType}} -> \code{lidOpenType}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-lidOpenType-new}{\code{lidOpenType$new()}}
+\item \href{#method-lidOpenType-clone}{\code{lidOpenType$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id=".asXMLnodes"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-.asXMLnodes'><code>RDML::rdmlBaseType$.asXMLnodes()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="copy"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-copy'><code>RDML::rdmlBaseType$copy()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="print"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-print'><code>RDML::rdmlBaseType$print()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-lidOpenType-new"></a>}}
+\if{latex}{\out{\hypertarget{method-lidOpenType-new}{}}}
+\subsection{Method \code{new()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{lidOpenType$new()}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-lidOpenType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-lidOpenType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{lidOpenType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}

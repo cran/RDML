@@ -4,9 +4,8 @@
 \name{baseTemperatureType}
 \alias{baseTemperatureType}
 \title{baseTemperatureType R6 class.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-baseTemperatureType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 Parent class for inner usage. Inherits: \link{rdmlBaseType}.
@@ -35,4 +34,55 @@ Parent class for inner usage. Inherits: \link{rdmlBaseType}.
   }
 }
 
-\keyword{datasets}
+\section{Super class}{
+\code{\link[RDML:rdmlBaseType]{RDML::rdmlBaseType}} -> \code{baseTemperatureType}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-baseTemperatureType-new}{\code{baseTemperatureType$new()}}
+\item \href{#method-baseTemperatureType-clone}{\code{baseTemperatureType$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id=".asXMLnodes"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-.asXMLnodes'><code>RDML::rdmlBaseType$.asXMLnodes()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="copy"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-copy'><code>RDML::rdmlBaseType$copy()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="print"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-print'><code>RDML::rdmlBaseType$print()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-baseTemperatureType-new"></a>}}
+\if{latex}{\out{\hypertarget{method-baseTemperatureType-new}{}}}
+\subsection{Method \code{new()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{baseTemperatureType$new(
+  duration,
+  temperatureChange = NULL,
+  durationChange = NULL,
+  measure = NULL,
+  ramp = NULL
+)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-baseTemperatureType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-baseTemperatureType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{baseTemperatureType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}

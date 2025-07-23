@@ -16,7 +16,6 @@ If \code{experiments} or \code{runs} have same name they will be combined.
 Reacts with same \code{id}, \code{experiment} and \code{run} overwrite each other!
 }
 \examples{
-\dontrun{
 PATH <- path.package("RDML")
 filename <- paste(PATH, "/extdata/", "lc96_bACTXY.rdml", sep ="")
 lc96 <- RDML$new(filename)
@@ -24,5 +23,4 @@ filename <- paste(PATH, "/extdata/", "stepone_std.rdml", sep ="")
 stepone <- RDML$new(filename)
 merged <- MergeRDMLs(list(lc96,stepone))
 merged$AsDendrogram()
-}
 }

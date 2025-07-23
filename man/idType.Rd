@@ -4,9 +4,8 @@
 \name{idType}
 \alias{idType}
 \title{idType R6 class.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-idType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 Contains identificator for varius RDML types. Inherits: \link{rdmlBaseType}.
@@ -19,4 +18,58 @@ Contains identificator for varius RDML types. Inherits: \link{rdmlBaseType}.
 }
 }
 
-\keyword{datasets}
+\section{Super class}{
+\code{\link[RDML:rdmlBaseType]{RDML::rdmlBaseType}} -> \code{idType}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-idType-new}{\code{idType$new()}}
+\item \href{#method-idType-.asXMLnodes}{\code{idType$.asXMLnodes()}}
+\item \href{#method-idType-clone}{\code{idType$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="copy"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-copy'><code>RDML::rdmlBaseType$copy()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="print"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-print'><code>RDML::rdmlBaseType$print()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-idType-new"></a>}}
+\if{latex}{\out{\hypertarget{method-idType-new}{}}}
+\subsection{Method \code{new()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{idType$new(id)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-idType-.asXMLnodes"></a>}}
+\if{latex}{\out{\hypertarget{method-idType-.asXMLnodes}{}}}
+\subsection{Method \code{.asXMLnodes()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{idType$.asXMLnodes(node.name)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-idType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-idType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{idType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}

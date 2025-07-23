@@ -10,8 +10,11 @@
 #' @param description output from \code{AsTable} function that describes fluorescence data.
 #' @param fdata.type 'adp' for qPCR, 'mdp' for melting data.
 #' 
+#' @docType methods
+#' @name RDML.SetFData
+#' @rdname setfdata-method
+#' @include RDML.R
 #' @examples
-#' \dontrun{
 #' PATH <- path.package("RDML")
 #' filename <- paste0(PATH, "/extdata/", "stepone_std.rdml")
 #' cfx96 <- RDML$new(filename)
@@ -28,24 +31,17 @@
 #'    function(y) CPP(x = cfx96.qPCR[, 1], y = y)$y.norm))
 #' cfx96$SetFData(cpp, tab2)
 #' library(ggplot2)
-#' library(gridExtra)
 #' cfx96.gg <- cfx96$GetFData(tab, long.table = TRUE)
 #' cpp.gg <- cfx96$GetFData(tab2,
 #'                          long.table = TRUE)
-#' plot1 <- ggplot(cfx96.gg, aes(x = cyc, y = fluor,
+#' ggplot(cfx96.gg, aes(x = cyc, y = fluor,
 #'                 group=fdata.name)) +
 #'                  geom_line() +
 #'                  ggtitle("Raw data")
-#' plot2 <- ggplot(cpp.gg, aes(x = cyc, y = fluor,
+#' ggplot(cpp.gg, aes(x = cyc, y = fluor,
 #'                 group=fdata.name)) +
 #'                  geom_line() +
 #'                  ggtitle("CPP processed data")
-#' grid.arrange(plot1, plot2, nrow=2)
-#' }
-#' @docType methods
-#' @name RDML.SetFData
-#' @rdname setfdata-method
-#' @include RDML.R
 RDML$set("public", "SetFData",
          function(fdata,
                   description,

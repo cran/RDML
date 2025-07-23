@@ -4,9 +4,8 @@
 \name{experimentType}
 \alias{experimentType}
 \title{experimentType R6 class.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-experimentType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 A qPCR experiment. It may contain several runs (\link{runType}). Inherits:
@@ -32,4 +31,59 @@ A qPCR experiment. It may contain several runs (\link{runType}). Inherits:
   reacts will be at one collumn.}}
 }
 
-\keyword{datasets}
+\section{Super class}{
+\code{\link[RDML:rdmlBaseType]{RDML::rdmlBaseType}} -> \code{experimentType}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-experimentType-new}{\code{experimentType$new()}}
+\item \href{#method-experimentType-GetFData}{\code{experimentType$GetFData()}}
+\item \href{#method-experimentType-clone}{\code{experimentType$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id=".asXMLnodes"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-.asXMLnodes'><code>RDML::rdmlBaseType$.asXMLnodes()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="copy"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-copy'><code>RDML::rdmlBaseType$copy()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="print"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-print'><code>RDML::rdmlBaseType$print()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-experimentType-new"></a>}}
+\if{latex}{\out{\hypertarget{method-experimentType-new}{}}}
+\subsection{Method \code{new()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{experimentType$new(id, description = NULL, documentation = NULL, run = NULL)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-experimentType-GetFData"></a>}}
+\if{latex}{\out{\hypertarget{method-experimentType-GetFData}{}}}
+\subsection{Method \code{GetFData()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{experimentType$GetFData(dp.type = "adp", long.table = FALSE)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-experimentType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-experimentType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{experimentType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}

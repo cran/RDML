@@ -4,9 +4,8 @@
 \name{dataType}
 \alias{dataType}
 \title{dataType R6 class.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-dataType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 Inherits: \link{rdmlBaseType}.
@@ -53,4 +52,69 @@ points as \code{data.frame}}
 }
 }
 
-\keyword{datasets}
+\section{Super class}{
+\code{\link[RDML:rdmlBaseType]{RDML::rdmlBaseType}} -> \code{dataType}
+}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-dataType-new}{\code{dataType$new()}}
+\item \href{#method-dataType-GetFData}{\code{dataType$GetFData()}}
+\item \href{#method-dataType-clone}{\code{dataType$clone()}}
+}
+}
+\if{html}{\out{
+<details open><summary>Inherited methods</summary>
+<ul>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id=".asXMLnodes"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-.asXMLnodes'><code>RDML::rdmlBaseType$.asXMLnodes()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="copy"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-copy'><code>RDML::rdmlBaseType$copy()</code></a></span></li>
+<li><span class="pkg-link" data-pkg="RDML" data-topic="rdmlBaseType" data-id="print"><a href='../../RDML/html/rdmlBaseType.html#method-rdmlBaseType-print'><code>RDML::rdmlBaseType$print()</code></a></span></li>
+</ul>
+</details>
+}}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-dataType-new"></a>}}
+\if{latex}{\out{\hypertarget{method-dataType-new}{}}}
+\subsection{Method \code{new()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{dataType$new(
+  tar,
+  cq = NULL,
+  excl = NULL,
+  adp = NULL,
+  mdp = NULL,
+  endPt = NULL,
+  bgFluor = NULL,
+  bgFluorSlp = NULL,
+  quantFluor = NULL
+)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-dataType-GetFData"></a>}}
+\if{latex}{\out{\hypertarget{method-dataType-GetFData}{}}}
+\subsection{Method \code{GetFData()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{dataType$GetFData(dp.type = "adp")}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-dataType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-dataType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{dataType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}

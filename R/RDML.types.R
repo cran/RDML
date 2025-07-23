@@ -32,7 +32,7 @@ checkDateTime <- function(dateTime){
 #' \item{\code{print(...)}}{prints object}}
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 rdmlBaseType <-
   R6Class("rdmlBaseType",
           # class = FALSE,
@@ -130,7 +130,7 @@ rdmlBaseType <-
                            },
                            NULL = "",
                            {
-                             if (class(private[[name]]) == "matrix")
+                             if (is(private[[name]], "matrix"))
                                sprintf("%s fluorescence data points",
                                        nrow(private[[name]]))
                              else
@@ -184,7 +184,7 @@ rdmlBaseType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 rdmlIdType <-
   R6Class("rdmlIdType",
@@ -239,7 +239,7 @@ rdmlIdType <-
 #' }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 idType <-
   R6Class("idType",
@@ -297,7 +297,7 @@ as.character.idType <- function(x, ...) x$id
 #' }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 reactIdType <-
   R6Class("reactIdType",
@@ -350,7 +350,7 @@ as.character.reactIdType <- function(x, ...) as.character(x$id)
 #' }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 idReferencesType <-
   R6Class("idReferencesType",
@@ -376,7 +376,7 @@ idReferencesType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 experimenterType <-
   R6Class("experimenterType",
@@ -459,7 +459,7 @@ experimenterType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 documentationType <-
   R6Class("documentationType",
@@ -505,7 +505,7 @@ documentationType <-
 #'   }}
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 dyeType <-
   R6Class("dyeType",
@@ -553,7 +553,7 @@ dyeType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 xRefType <-
   R6Class("xRefType",
@@ -597,7 +597,7 @@ xRefType <-
 #'   Property name} \item{value}{\link[checkmate]{checkString}. Value} }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 #' @examples
 #' #set sex property
@@ -647,7 +647,7 @@ annotationType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 quantityType <-
   R6Class("quantityType",
@@ -700,7 +700,7 @@ quantityType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 cdnaSynthesisMethodType <-
   R6Class("cdnaSynthesisMethodType",
@@ -765,7 +765,7 @@ cdnaSynthesisMethodType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 templateQuantityType <-
   R6Class("templateQuantityType",
@@ -810,7 +810,7 @@ templateQuantityType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 enumType <-
   R6Class("enumType",
           # class = FALSE,
@@ -869,7 +869,7 @@ enumType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 sampleTypeType <-
   R6Class("sampleTypeType",
@@ -905,7 +905,7 @@ sampleTypeType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 quantityUnitType <-
   R6Class("quantityUnitType",
@@ -938,7 +938,7 @@ quantityUnitType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 primingMethodType <-
   R6Class("primingMethodType",
@@ -974,7 +974,7 @@ primingMethodType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 nucleotideType <-
   R6Class("nucleotideType",
@@ -1032,7 +1032,7 @@ nucleotideType <-
 #'  }
 #'
 #'@docType class
-#'@format An \code{\link{R6Class}} generator object.
+#'@format An \code{\link[R6]{R6Class}} generator object.
 #'@export
 sampleType <-
   R6Class("sampleType",
@@ -1166,7 +1166,7 @@ sampleType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 oligoType <-
   R6Class("oligoType",
@@ -1225,7 +1225,7 @@ oligoType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 sequencesType <-
   R6Class("sequencesType",
@@ -1299,7 +1299,7 @@ sequencesType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 commercialAssayType <-
   R6Class("commercialAssayType",
@@ -1349,7 +1349,7 @@ commercialAssayType <-
 #' }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 targetTypeType <-
   R6Class("targetTypeType",
@@ -1389,7 +1389,7 @@ targetTypeType <-
 #'   \item{\code{commercialAssay}}{\link{commercialAssayType}.} }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 targetType <-
   R6Class("targetType",
@@ -1624,7 +1624,7 @@ targetType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 #' @examples
 #' #cycles
@@ -1721,7 +1721,7 @@ adpsType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 mdpsType <-
   R6Class("mdpsType",
@@ -1804,7 +1804,7 @@ mdpsType <-
 #' }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 dataType <-
   R6Class("dataType",
@@ -1959,7 +1959,7 @@ dataType <-
 #' information if the experiment contains more than 26 rows!}}
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 reactType <-
   R6Class("reactType",
@@ -2073,7 +2073,7 @@ reactType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 #' @examples
 #' dataCollectionSoftwareType$new(name = "ExampleSoft",
@@ -2129,7 +2129,7 @@ dataCollectionSoftwareType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 cqDetectionMethodType <-
   R6Class("cqDetectionMethodType",
@@ -2163,7 +2163,7 @@ cqDetectionMethodType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 labelFormatType <-
   R6Class("labelFormatType",
@@ -2210,7 +2210,7 @@ labelFormatType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 pcrFormatType <-
   R6Class("pcrFormatType",
@@ -2298,7 +2298,7 @@ pcrFormatType <-
 #'  points as \code{data.frame}}}
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 runType <-
   R6Class("runType",
@@ -2485,7 +2485,7 @@ runType <-
 #'   reacts will be at one collumn.}}
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 experimentType <-
   R6Class("experimentType",
@@ -2575,7 +2575,7 @@ experimentType <-
 #'
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 lidOpenType <-
   R6Class("lidOpenType",
@@ -2602,7 +2602,7 @@ lidOpenType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 pauseType <-
   R6Class("pauseType",
@@ -2644,7 +2644,7 @@ pauseType <-
 #'   "repeat" - 1.}}
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 loopType <-
   R6Class("loopType",
@@ -2694,7 +2694,7 @@ loopType <-
 #' }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 measureType <-
   R6Class("measureType",
@@ -2733,7 +2733,7 @@ measureType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 baseTemperatureType <-
   R6Class("baseTemperatureType",
           # class = FALSE,
@@ -2806,7 +2806,7 @@ baseTemperatureType <-
 #' }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 temperatureType <-
   R6Class("temperatureType",
@@ -2848,7 +2848,7 @@ temperatureType <-
 #' \item{\code{...}}{ Params of parent class \link{baseTemperatureType}. }}
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 gradientType <-
   R6Class("gradientType",
@@ -2904,7 +2904,7 @@ gradientType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 stepType <-
   R6Class("stepType",
@@ -3003,7 +3003,7 @@ stepType <-
 #'   }
 #'
 #' @docType class
-#' @format An \code{\link{R6Class}} generator object.
+#' @format An \code{\link[R6]{R6Class}} generator object.
 #' @export
 thermalCyclingConditionsType <-
   R6Class("thermalCyclingConditionsType",

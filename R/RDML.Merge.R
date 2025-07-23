@@ -11,7 +11,6 @@
 #' @include RDML.R
 #' @export
 #' @examples
-#' \dontrun{
 #' PATH <- path.package("RDML")
 #' filename <- paste(PATH, "/extdata/", "lc96_bACTXY.rdml", sep ="")
 #' lc96 <- RDML$new(filename)
@@ -19,7 +18,6 @@
 #' stepone <- RDML$new(filename)
 #' merged <- MergeRDMLs(list(lc96,stepone))
 #' merged$AsDendrogram()
-#' }
 MergeRDMLs <- function(to.merge) {
   baseRDML <- to.merge[[1]]$copy()
   for (rdml in to.merge[-1]) {

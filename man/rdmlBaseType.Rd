@@ -4,9 +4,8 @@
 \name{rdmlBaseType}
 \alias{rdmlBaseType}
 \title{Base R6 class for RDML package.}
-\format{An \code{\link{R6Class}} generator object.}
-\usage{
-rdmlBaseType
+\format{
+An \code{\link[R6]{R6Class}} generator object.
 }
 \description{
 Most classes from RDML package inherit this class. It is designed for internal
@@ -25,4 +24,57 @@ usage and should not be directly accessed.
 \item{\code{print(...)}}{prints object}}
 }
 
-\keyword{datasets}
+\section{Methods}{
+\subsection{Public methods}{
+\itemize{
+\item \href{#method-rdmlBaseType-.asXMLnodes}{\code{rdmlBaseType$.asXMLnodes()}}
+\item \href{#method-rdmlBaseType-copy}{\code{rdmlBaseType$copy()}}
+\item \href{#method-rdmlBaseType-print}{\code{rdmlBaseType$print()}}
+\item \href{#method-rdmlBaseType-clone}{\code{rdmlBaseType$clone()}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-rdmlBaseType-.asXMLnodes"></a>}}
+\if{latex}{\out{\hypertarget{method-rdmlBaseType-.asXMLnodes}{}}}
+\subsection{Method \code{.asXMLnodes()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{rdmlBaseType$.asXMLnodes(node.name)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-rdmlBaseType-copy"></a>}}
+\if{latex}{\out{\hypertarget{method-rdmlBaseType-copy}{}}}
+\subsection{Method \code{copy()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{rdmlBaseType$copy()}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-rdmlBaseType-print"></a>}}
+\if{latex}{\out{\hypertarget{method-rdmlBaseType-print}{}}}
+\subsection{Method \code{print()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{rdmlBaseType$print(...)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-rdmlBaseType-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-rdmlBaseType-clone}{}}}
+\subsection{Method \code{clone()}}{
+The objects of this class are cloneable with this method.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{rdmlBaseType$clone(deep = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{deep}}{Whether to make a deep clone.}
+}
+\if{html}{\out{</div>}}
+}
+}
+}
